@@ -1,7 +1,7 @@
 import click
-import curses
 from src.services.menu_manager import MenuManager
-from src.utils.curses_utils import init_curses, teardown_curses, display_message, get_user_input
+from src.services.session_manager import SessionManager
+from src.utils.prompt_toolkit_utils import get_user_input, display_menu
 from src.utils.input_validator import validate_integer
 
 @click.group()
@@ -13,51 +13,39 @@ def menu():
 def start():
     """Starts the main hierarchical menu."""
     manager = MenuManager()
-    stdscr = None
-    try:
-        stdscr = init_curses()
-        current_menu_id = "main"
-        while True:
-            stdscr.clear()
-            menu_items = manager.get_menu_items(current_menu_id)
-            if not menu_items:
-                display_message(stdscr, "No menu items found.", 0, 0)
-                stdscr.getch()
-                break
+    current_menu_id = "main"
+    user_id = SessionManager.get_current_user().username
+    while True:
+        menu_items = manager.get_menu_items(current_menu_id)
+        if not menu_items:
+            print("No menu items found.")
+            break
+        
+        # Display the menu using the utility function, not a method of MenuManager
+        # The title should reflect the current menu, and items should be passed directly
+        menu_title = next((item.label for item in manager.menu_item_persistence.get_all_menu_items() if item.id == current_menu_id), "Menu") # This line is causing the error
+        display_menu(menu_title, menu_items)
 
-            manager.display_menu(stdscr, current_menu_id)
+        choice = get_user_input("Enter your choice: ").strip().upper()
 
-            choice = get_user_input(stdscr, "", len(menu_items) + 3, len("Enter your choice: ")).strip().upper()
-
-            if choice == 'Q':
-                break
-            elif choice == 'B' and current_menu_id != "main":
-                current_menu_id = manager.return_to_parent_menu(current_menu_id)
-            elif choice == 'H': # Added for help command
-                manager.display_help(stdscr, current_menu_id)
-                stdscr.getch()
-            else:
-                is_valid, validated_choice = validate_integer(choice, min_val=1, max_val=len(menu_items))
-                if is_valid:
-                    selected_item = menu_items[validated_choice - 1]
-                    if selected_item.action.startswith("menu:"):
-                        current_menu_id = manager.navigate_to_submenu(current_menu_id, selected_item.action.split(":")[1])
-                    elif selected_item.action.startswith("command:"):
-                        manager.execute_command_action(stdscr, selected_item.action)
-                    else:
-                        display_message(stdscr, f"Unknown action type: {selected_item.action}", len(menu_items) + 4, 0)
-                        stdscr.getch()
+        if choice == 'Q':
+            break
+        elif choice == 'B' and current_menu_id != "main":
+            current_menu_id = manager.return_to_parent_menu(current_menu_id, user_id)
+        elif choice == 'H': # Added for help command
+            print(manager.get_contextual_help(current_menu_id))
+        else:
+            is_valid, validated_choice = validate_integer(choice, min_val=1, max_val=len(menu_items))
+            if is_valid:
+                selected_item = menu_items[validated_choice - 1]
+                if selected_item.action.startswith("menu:"):
+                    current_menu_id = manager.navigate_to_submenu(current_menu_id, selected_item.action.split(":")[1], user_id)
+                elif selected_item.action.startswith("command:"):
+                    manager.execute_command_action(selected_item.action)
                 else:
-                    display_message(stdscr, f"Invalid input: {validated_choice}. Please enter a number, 'Q', 'B', or 'H'.", len(menu_items) + 4, 0)
-                    stdscr.getch()
-
-    except Exception as e:
-        if stdscr:
-            teardown_curses(stdscr)
-        click.echo(f"An error occurred: {e}")
-    finally:
-        if stdscr:
-            teardown_curses(stdscr)
+                    print(f"Unknown action type: {selected_item.action}")
+            else:
+                print(f"Invalid input: {validated_choice}. Please enter a number, 'Q', 'B', or 'H'.")
 
 @menu.command()
 @click.argument('option_id')

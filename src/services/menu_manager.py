@@ -1,10 +1,12 @@
 # src/services/menu_manager.py
+from datetime import date
 from src.models.menu_item import MenuItem, MenuItemPersistence
 from src.models.menu_state import MenuState, MenuStatePersistence
-from src.utils.curses_utils import display_message, get_user_input
+from src.utils.prompt_toolkit_utils import display_menu, get_user_input
 from src.utils.input_validator import validate_number, validate_iso_date, validate_type, validate_description, validate_category
 from src.services.transaction_manager import TransactionManager
 from src.services.category_manager import CategoryManager
+from src.services.session_manager import SessionManager
 
 class MenuManager:
     def __init__(self):
@@ -42,25 +44,7 @@ class MenuManager:
     def get_primary_menu(self):
         return self.get_menu_items(parent_id="main")
 
-    def display_menu(self, stdscr, menu_id, current_user_id=None):
-        stdscr.clear()
-        menu_items = self.get_menu_items(menu_id)
-        if not menu_items:
-            display_message(stdscr, "No menu items found.", 0, 0)
-            return
 
-        # Placeholder for handling long menus (pagination/search) - FR-005
-        # For now, assumes all menu items fit on screen given Max items per menu: 20 constraint.
-        # Future enhancement: implement pagination or search if menu_items exceeds screen height.
-
-        # Display menu title (assuming menu_id is also the title for now)
-        display_message(stdscr, f"--- {menu_id.replace('_', ' ').title()} Menu ---", 0, 0)
-        for i, item in enumerate(menu_items):
-            display_message(stdscr, f"{i+1}. {item.label}", i+1, 0)
-        display_message(stdscr, "Q. Exit", len(menu_items) + 1, 0)
-        if menu_id != "main":
-            display_message(stdscr, "B. Back", len(menu_items) + 2, 0)
-        display_message(stdscr, "Enter your choice: ", len(menu_items) + 3, 0)
 
     def navigate_to_submenu(self, current_menu_id, target_menu_id, user_id="default_user"):
         # For simplicity, assuming a single user for now
@@ -94,100 +78,93 @@ class MenuManager:
             help_text += "\nQ: Exit, B: Back, H: Help"
             return help_text
 
-    def display_help(self, stdscr, menu_id, item_id=None):
-        help_content = self.get_contextual_help(menu_id, item_id)
-        stdscr.clear()
-        display_message(stdscr, help_content, 0, 0)
-        display_message(stdscr, "Press any key to return...", help_content.count('\n') + 2, 0)
-
-    def execute_command_action(self, stdscr, action_string):
+    def execute_command_action(self, action_string):
         command_name = action_string.split(":")[1]
+        user_id = SessionManager.get_current_user().username
         if command_name == "add_transaction":
-            self._handle_add_transaction(stdscr)
+            self._handle_add_transaction(user_id)
         elif command_name == "view_transactions":
-            self._handle_view_transactions(stdscr)
+            self._handle_view_transactions(user_id)
         elif command_name == "monthly_report":
-            self._handle_monthly_report(stdscr)
+            self._handle_monthly_report()
         elif command_name == "category_breakdown":
-            self._handle_category_breakdown(stdscr)
+            self._handle_category_breakdown()
         elif command_name == "change_pin":
-            self._handle_change_pin(stdscr)
+            self._handle_change_pin()
         else:
-            display_message(stdscr, f"Unknown command: {command_name}", 0, 0)
-            stdscr.getch()
+            print(f"Unknown command: {command_name}")
 
-    def _handle_add_transaction(self, stdscr):
-        stdscr.clear()
-        display_message(stdscr, "--- Add New Transaction ---", 0, 0)
+    def _handle_add_transaction(self, user_id):
+        print("--- Add New Transaction ---")
         
-        amount_str = get_user_input(stdscr, "Amount: ", 2, 0)
-        is_valid, amount = validate_number(amount_str)
-        if not is_valid:
-            display_message(stdscr, f"Error: {amount}. Press any key to continue.", 4, 0)
-            stdscr.getch()
-            return
+        while True:
+            amount_str = get_user_input("Amount: ")
+            is_valid, amount = validate_number(amount_str)
+            if is_valid:
+                break
+            print(f"Error: {amount}")
 
-        date_str = get_user_input(stdscr, "Date (YYYY-MM-DD): ", 3, 0)
-        is_valid, date = validate_iso_date(date_str)
-        if not is_valid:
-            display_message(stdscr, f"Error: {date}. Press any key to continue.", 4, 0)
-            stdscr.getch()
-            return
+        while True:
+            date_str = get_user_input(f"Date (YYYY-MM-DD) [default: {date.today().isoformat()}]: ")
+            if not date_str:
+                transaction_date = date.today().isoformat()
+                break
+            is_valid, transaction_date = validate_iso_date(date_str)
+            if is_valid:
+                break
+            print(f"Error: {transaction_date}")
+        
+        while True:
+            type_str = get_user_input("Type (income/expense): ")
+            is_valid, transaction_type = validate_type(type_str)
+            if is_valid:
+                break
+            print(f"Error: {transaction_type}")
 
-        type_str = get_user_input(stdscr, "Type (income/expense): ", 4, 0)
-        is_valid, transaction_type = validate_type(type_str)
-        if not is_valid:
-            display_message(stdscr, f"Error: {transaction_type}. Press any key to continue.", 6, 0)
-            stdscr.getch()
-            return
+        while True:
+            description = get_user_input("Description: ")
+            is_valid, description = validate_description(description)
+            if is_valid:
+                break
+            print(f"Error: {description}")
 
-        description = get_user_input(stdscr, "Description: ", 5, 0)
-        is_valid, description = validate_description(description)
-        if not is_valid:
-            display_message(stdscr, f"Error: {description}. Press any key to continue.", 7, 0)
-            stdscr.getch()
-            return
+        while True:
+            categories = CategoryManager.get_categories()
+            print(f"Available Categories: {', '.join(categories)}")
+            category = get_user_input("Category: ")
+            is_valid, category_error = validate_category(category)
+            if not is_valid:
+                print(f"Error: {category_error}")
+                continue
+            if not CategoryManager.is_valid_category(category):
+                print(f"Error: Invalid category '{category}'")
+                continue
+            break
 
-        categories = CategoryManager.get_categories()
-        display_message(stdscr, f"Available Categories: {', '.join(categories)}", 7, 0)
-        category = get_user_input(stdscr, "Category: ", 8, 0)
-        is_valid, category = validate_category(category)
-        if not is_valid:
-            display_message(stdscr, f"Error: {category}. Press any key to continue.", 10, 0)
-            stdscr.getch()
-            return
-        if not CategoryManager.is_valid_category(category):
-            display_message(stdscr, f"Error: Invalid category '{category}'. Press any key to continue.", 10, 0)
-            stdscr.getch()
-            return
-
-        if self.transaction_manager.add_transaction(amount, date, transaction_type, description, category):
-            display_message(stdscr, "Transaction added successfully. Press any key to continue.", 10, 0)
+        if self.transaction_manager.add_transaction(amount, transaction_date, transaction_type, description, category, user_id):
+            print("Transaction added successfully.")
         else:
-            display_message(stdscr, "Failed to add transaction. Press any key to continue.", 10, 0)
-        stdscr.getch()
+            print("Failed to add transaction.")
+        get_user_input("Press Enter to continue...")
 
-    def _handle_view_transactions(self, stdscr):
-        stdscr.clear()
-        display_message(stdscr, "--- View Transactions ---", 0, 0)
-        transactions = self.transaction_manager.get_all_transactions()
+    def _handle_view_transactions(self, user_id):
+        print("--- View Transactions ---")
+        transactions = self.transaction_manager.get_all_transactions(user_id)
         if not transactions:
-            display_message(stdscr, "No transactions found.", 2, 0)
+            print("No transactions found.")
         else:
-            y_offset = 2
-            for i, t in enumerate(transactions):
-                display_message(stdscr, f"ID: {t.id[:8]}..., Amount: {t.amount}, Date: {t.date}, Type: {t.type}, Desc: {t.description}, Cat: {t.category}", y_offset + i, 0)
-        display_message(stdscr, "Press any key to continue...", y_offset + len(transactions) + 1, 0)
-        stdscr.getch()
+            for t in transactions:
+                print(f"ID: {t.id[:8]}..., Amount: {t.amount}, Date: {t.date}, Type: {t.type}, Desc: {t.description}, Cat: {t.category}")
+        get_user_input("Press Enter to continue...")
 
-    def _handle_monthly_report(self, stdscr):
-        display_message(stdscr, "Monthly report functionality not yet implemented.", 0, 0)
-        stdscr.getch()
+    def _handle_monthly_report(self):
+        print("Monthly report functionality not yet implemented.")
+        get_user_input("Press Enter to continue...")
 
-    def _handle_category_breakdown(self, stdscr):
-        display_message(stdscr, "Category breakdown functionality not yet implemented.", 0, 0)
-        stdscr.getch()
+    def _handle_category_breakdown(self):
+        print("Category breakdown functionality not yet implemented.")
+        get_user_input("Press Enter to continue...")
 
-    def _handle_change_pin(self, stdscr):
-        display_message(stdscr, "Change PIN functionality not yet implemented.", 0, 0)
-        stdscr.getch()
+    def _handle_change_pin(self):
+        print("Change PIN functionality not yet implemented.")
+        get_user_input("Press Enter to continue...")

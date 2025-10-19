@@ -5,13 +5,14 @@ import uuid
 from datetime import datetime
 
 class Transaction:
-    def __init__(self, amount, date, type, description, category, id=None):
+    def __init__(self, amount, date, type, description, category, user_id, id=None):
         self.id = id if id else str(uuid.uuid4())
         self.amount = float(amount)
         self.date = date # Store as ISO format string YYYY-MM-DD
         self.type = type # "income" or "expense"
         self.description = description
         self.category = category
+        self.user_id = user_id
 
     def to_dict(self):
         return {
@@ -20,12 +21,13 @@ class Transaction:
             "date": self.date,
             "type": self.type,
             "description": self.description,
-            "category": self.category
+            "category": self.category,
+            "user_id": self.user_id
         }
 
     @classmethod
     def from_dict(cls, data):
-        return cls(data["amount"], data["date"], data["type"], data["description"], data["category"], data["id"])
+        return cls(data["amount"], data["date"], data["type"], data["description"], data["category"], data.get("user_id"), data["id"])
 
 class TransactionPersistence:
     def __init__(self, storage_file="transactions.json"):

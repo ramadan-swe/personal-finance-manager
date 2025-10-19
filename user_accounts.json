@@ -4,5 +4,17 @@
         "hashed_pin": "d81fcb2de2bb3edee7a9add9d1df9641ffdc06ee901afc3a04cef6fec4c9a4ae",
         "salt": "14166cc8c1429e94f9a99e1960b90557",
         "profile_info": {}
+    },
+    "alim": {
+        "username": "alim",
+        "hashed_pin": "72a3d5c37aa1b6393f2b6ed5d69f2fed93632f837fb82fd13bea81c0a76db607",
+        "salt": "81edcaf12c9d99c60dce563a0a8d87cd",
+        "profile_info": {}
+    },
+    "abdo": {
+        "username": "abdo",
+        "hashed_pin": "e15e78facaa864ca57334564611880e5d8b90c4e3f0a1250ac5fe4f63f035c8e",
+        "salt": "7de7c84532bd4ca1697accc0ed893867",
+        "profile_info": {}
     }
 }

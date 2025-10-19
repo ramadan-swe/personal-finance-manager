@@ -2,6 +2,13 @@
 import re
 from datetime import datetime
 
+def validate_username(username):
+    if not (3 <= len(username) <= 20):
+        return False, "Username must be between 3 and 20 characters long."
+    if ' ' in username:
+        return False, "Username cannot contain spaces."
+    return True, username
+
 def validate_integer(value_str, min_val=None, max_val=None):
     try:
         value = int(value_str)

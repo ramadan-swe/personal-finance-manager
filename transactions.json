@@ -5,6 +5,34 @@
         "date": "2025-10-26",
         "type": "expense",
         "description": "taxi",
-        "category": "Transport"
+        "category": "Transport",
+        "user_id": "ahmed"
+    },
+    {
+        "id": "0edf7882-3319-4710-a7e0-0f88f96be1db",
+        "amount": 100.0,
+        "date": "2025-10-25",
+        "type": "expense",
+        "description": "test",
+        "category": "Education",
+        "user_id": "abdo"
+    },
+    {
+        "id": "118373f2-774d-4ad7-a43b-97bc444ce21a",
+        "amount": 200.0,
+        "date": "2025-10-25",
+        "type": "income",
+        "description": "test",
+        "category": "Education",
+        "user_id": "abdo"
+    },
+    {
+        "id": "66aa91ff-33bc-4c0c-b395-5e966797aa11",
+        "amount": 230.0,
+        "date": "2025-10-25",
+        "type": "income",
+        "description": "test",
+        "category": "Transport",
+        "user_id": "ahmed"
     }
 ]
