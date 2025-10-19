@@ -34,5 +34,32 @@
         "description": "test",
         "category": "Transport",
         "user_id": "ahmed"
+    },
+    {
+        "id": "5ee39f0c-2aa0-4a44-8aac-655fc86dae05",
+        "amount": 210.0,
+        "date": "2025-10-26",
+        "type": "income",
+        "description": "test",
+        "category": "Education",
+        "user_id": "ahmed"
+    },
+    {
+        "id": "4e8416d5-fb78-4585-84b7-603098f98de5",
+        "amount": 3212.0,
+        "date": "2025-10-26",
+        "type": "income",
+        "description": "asd",
+        "category": "Uncategorized",
+        "user_id": "ahmed"
+    },
+    {
+        "id": "21163bab-f018-4570-a30a-8e27a0af4a4e",
+        "amount": 2301.0,
+        "date": "2025-10-26",
+        "type": "income",
+        "description": "asfsv",
+        "category": "Uncategorized",
+        "user_id": "mohamed"
     }
 ]

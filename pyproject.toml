@@ -6,9 +6,8 @@ authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.10"
 prompt-toolkit = "^3.0.52"
-click = "^8.3.0"
 
 
 [build-system]

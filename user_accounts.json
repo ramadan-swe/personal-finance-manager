@@ -16,5 +16,29 @@
         "hashed_pin": "e15e78facaa864ca57334564611880e5d8b90c4e3f0a1250ac5fe4f63f035c8e",
         "salt": "7de7c84532bd4ca1697accc0ed893867",
         "profile_info": {}
+    },
+    "mohamed": {
+        "username": "mohamed",
+        "hashed_pin": "8ba9fe1f39945561372678f71105911757fd4ef5a1323a542a376953e04c491b",
+        "salt": "e4bc5d795b39e4f41732d7d9776a96cc",
+        "profile_info": {}
+    },
+    "said": {
+        "username": "said",
+        "hashed_pin": "f1872b48a96facf6b73ffbc8f6366b5815a37abcaed3ab00ca0053bbbfedb83d",
+        "salt": "d557c5bfc8913d3a2648e408d7409143",
+        "profile_info": {}
+    },
+    "sai": {
+        "username": "sai",
+        "hashed_pin": "5296139e1f19bb9a9a4825afbe657970cc11b129cca8fccb2a2f34b5465d053d",
+        "salt": "9502c2aba00de2b9400fe9645f733635",
+        "profile_info": {}
+    },
+    "mo": {
+        "username": "mo",
+        "hashed_pin": "13691b0cd382e3a07969c493c9df79b024cb385622996726a182bedff26f3217",
+        "salt": "af5159fafce247c566d9bc81cea7656d",
+        "profile_info": {}
     }
 }

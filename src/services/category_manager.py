@@ -1,20 +1,17 @@
 # src/services/category_manager.py
 
-class CategoryManager:
-    _categories = ["Food", "Transport", "Housing", "Entertainment", "Salary", "Investments", "Utilities", "Healthcare", "Education", "Miscellaneous"]
+_categories = ["Food", "Transport", "Housing", "Entertainment", "Salary", "Investments", "Utilities", "Healthcare", "Education", "Miscellaneous"]
 
-    @classmethod
-    def get_categories(cls):
-        return sorted(cls._categories)
+def get_categories():
+    return sorted(_categories)
 
-    @classmethod
-    def is_valid_category(cls, category):
-        return category in cls._categories
+def is_valid_category(category):
+    return category in _categories
 
-    @classmethod
-    def add_category(cls, category):
-        if category not in cls._categories:
-            cls._categories.append(category)
-            cls._categories.sort()
-            return True
-        return False
+def add_category(category):
+    global _categories
+    if category not in _categories:
+        _categories.append(category)
+        _categories.sort()
+        return True
+    return False
