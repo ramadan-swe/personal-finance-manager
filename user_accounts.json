@@ -40,5 +40,17 @@
         "hashed_pin": "13691b0cd382e3a07969c493c9df79b024cb385622996726a182bedff26f3217",
         "salt": "af5159fafce247c566d9bc81cea7656d",
         "profile_info": {}
+    },
+    "lol": {
+        "username": "lol",
+        "hashed_pin": "2cc412275ac7a506386cae1fe1e713e8381f42c5cc2357f0d89c6ad27b8e6491",
+        "salt": "c617579ae3c19f303ec03f9d493bb6d3",
+        "profile_info": {}
+    },
+    "oioas": {
+        "username": "oioas",
+        "hashed_pin": "95a1a877f6a805066535ef17b23fb32ad683721ee89e970d17370094ed539c80",
+        "salt": "e1721e798a9d5c9d78b87f07f3c9950a",
+        "profile_info": {}
     }
 }

@@ -61,5 +61,14 @@
         "description": "asfsv",
         "category": "Uncategorized",
         "user_id": "mohamed"
+    },
+    {
+        "id": "724afd83-2bf0-4fc7-98ad-88e10ad9896a",
+        "amount": 213.0,
+        "date": "2025-10-26",
+        "type": "income",
+        "description": "asgkvl",
+        "category": "Uncategorized",
+        "user_id": "ahmed"
     }
 ]

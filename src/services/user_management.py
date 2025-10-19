@@ -26,3 +26,10 @@ class UserManagementService:
         # The user_account object passed here should already have its profile_info updated
         # We just need to persist the changes.
         return self.persistence.update_account(user_account)
+    
+    def update_pin(self, user_account, new_pin):
+        salt = generate_salt()
+        hashed_pin = hash_pin(new_pin, salt)
+        user_account.hashed_pin = hashed_pin
+        user_account.salt = salt
+        return self.persistence.update_account(user_account)

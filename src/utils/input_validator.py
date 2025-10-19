@@ -50,11 +50,9 @@ def validate_iso_date(date_str):
     except ValueError:
         return False, "Date must be in YYYY-MM-DD format."
 
-def validate_pin(pin_str, min_len=4, max_len=6):
-    if not re.fullmatch(r"^\d+$", pin_str):
-        return False, "PIN must contain only digits."
-    if not (min_len <= len(pin_str) <= max_len):
-        return False, f"PIN must be between {min_len} and {max_len} digits long."
+def validate_pin(pin_str):
+    if not re.fullmatch(r"^\d{6}$", pin_str):
+        return False, "PIN must contain only 6 digits."
     return True, pin_str
 
 def validate_yes_no(input_str):

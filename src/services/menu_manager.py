@@ -1,9 +1,11 @@
 from datetime import date
-from src.utils.prompt_toolkit_utils import display_menu, get_user_input
-from src.utils.input_validator import validate_number, validate_iso_date, validate_type, validate_description, validate_category
+from src.utils.prompt_toolkit_utils import display_menu, get_user_input, add_message, print_formatted_text
+from src.utils.input_validator import validate_number, validate_iso_date, validate_type, validate_description, validate_category, validate_pin
 from src.services.transaction_manager import TransactionManager
 from src.services.category_manager import get_categories, is_valid_category
 from src.services.session_manager import SessionManager
+from src.services.user_management import UserManagementService # Import UserManagementService
+from src.cli.user import update_profile_command, switch, logout # Import user management functions
 
 # Global variables for menu management
 _navigation_stack = []
@@ -31,6 +33,9 @@ _ALL_MENUS = {
         "label": "Settings Menu",
         "items": [
             {"id": "change_pin", "label": "Change PIN", "action": "command:change_pin", "help_text": "Change user PIN"},
+            {"id": "update_profile", "label": "Update Profile", "action": "command:update_profile", "help_text": "Update current user's profile information"},
+            {"id": "switch_account", "label": "Switch Account", "action": "command:switch_account", "help_text": "Switch to another user account"},
+            {"id": "logout", "label": "Logout", "action": "command:logout", "help_text": "Log out the current user"},
         ]
     }
 }
@@ -82,7 +87,7 @@ def execute_command_action(action_string):
     command_name = action_string.split(":")[1]
     current_user = SessionManager.get_current_user()
     if not current_user:
-        print("Error: No user is currently logged in. Please log in first.")
+        add_message("Error: No user is currently logged in. Please log in first.")
         return
     user_id = current_user.username
     if command_name == "add_transaction":
@@ -95,18 +100,24 @@ def execute_command_action(action_string):
         _handle_category_breakdown()
     elif command_name == "change_pin":
         _handle_change_pin()
+    elif command_name == "update_profile":
+        update_profile_command() # Call the standalone function from src/cli/user.py
+    elif command_name == "switch_account":
+        switch() # Call the standalone function from src/cli/user.py
+    elif command_name == "logout":
+        logout() # Call the standalone function from src/cli/user.py
     else:
-        print(f"Unknown command: {command_name}")
+        add_message(f"Unknown command: {command_name}")
 
 def _handle_add_transaction(user_id):
-    print("--- Add New Transaction ---")
+    add_message("--- Add New Transaction ---")
     
     while True:
         amount_str = get_user_input("Amount: ")
         is_valid, amount = validate_number(amount_str)
         if is_valid:
             break
-        print(f"Error: {amount}")
+        add_message(f"Error: {amount}")
 
     while True:
         date_str = get_user_input(f"Date (YYYY-MM-DD) [default: {date.today().isoformat()}]: ")
@@ -116,62 +127,119 @@ def _handle_add_transaction(user_id):
         is_valid, transaction_date = validate_iso_date(date_str)
         if is_valid:
             break
-        print(f"Error: {transaction_date}")
+        add_message(f"Error: {transaction_date}")
     
     while True:
         type_str = get_user_input("Type (income/expense): ")
         is_valid, transaction_type = validate_type(type_str)
         if is_valid:
             break
-        print(f"Error: {transaction_type}")
+        add_message(f"Error: {transaction_type}")
 
     while True:
         description = get_user_input("Description: ")
         is_valid, description = validate_description(description)
         if is_valid:
             break
-        print(f"Error: {description}")
+        add_message(f"Error: {description}")
 
     while True:
         categories = get_categories()
-        print(f"Available Categories: {', '.join(categories)}")
+        add_message(f"Available Categories: {', '.join(categories)}", immediate=True)
         category = get_user_input("Category (leave empty for 'Uncategorized'): ")
         if not category:
             category = "Uncategorized"
             break
         is_valid, category_error = validate_category(category)
         if not is_valid:
-            print(f"Error: {category_error}")
+            add_message(f"Error: {category_error}")
             continue
         if not is_valid_category(category):
-            print(f"Error: Invalid category '{category}'")
+            add_message(f"Error: Invalid category '{category}'")
             continue
         break
 
     if _transaction_manager.add_transaction(amount, transaction_date, transaction_type, description, category, user_id):
-        print("Transaction added successfully.")
+        add_message("Transaction added successfully.")
     else:
-        print("Failed to add transaction.")
+        add_message("Failed to add transaction.")
     get_user_input("Press Enter to continue...")
 
 def _handle_view_transactions(user_id):
-    print("--- View Transactions ---")
     transactions = _transaction_manager.get_all_transactions(user_id)
     if not transactions:
-        print("No transactions found.")
+        add_message("No transactions found.", immediate=True)
     else:
+        # Define column widths
+        id_width = 10
+        date_width = 12
+        type_width = 8
+        category_width = 25
+        amount_width = 12
+        description_width = 40 # Added description column
+
+        header = (f"{'ID':<{id_width}} | {'Date':<{date_width}} | {'Type':<{type_width}} | "
+                  f"{'Category':<{category_width}} | {'Amount':>{amount_width}} | {'Description':<{description_width}}")
+        
+        separator = "=" * (id_width + date_width + type_width + category_width + amount_width + description_width + (5 * 3)) # 5 for '|' and spaces
+
+        add_message(separator, immediate=True)
+        add_message(header, immediate=True)
+        add_message("-" * len(header), immediate=True) # Separator under header
+
         for t in transactions:
-            print(f"ID: {t.id[:8]}..., Amount: {t.amount}, Date: {t.date}, Type: {t.type}, Desc: {t.description}, Cat: {t.category}")
+            # Truncate ID for display
+            display_id = t.id[:id_width-3] + "..." if len(t.id) > id_width else t.id
+            # Format amount to 2 decimal places and right-align
+            formatted_amount = f"${t.amount:,.2f}"
+            # Truncate description if too long
+            display_description = t.description[:description_width] + "..." if len(t.description) > description_width else t.description
+
+            row = (f"{display_id:<{id_width}} | {t.date:<{date_width}} | {t.type:<{type_width}} | "
+                   f"{t.category:<{category_width}} | {formatted_amount:>{amount_width}} | {display_description:<{description_width}}")
+            add_message(row, immediate=True)
+        add_message(separator, immediate=True)
     get_user_input("Press Enter to continue...")
 
 def _handle_monthly_report():
-    print("Monthly report functionality not yet implemented.")
+    add_message("Monthly report functionality not yet implemented.")
     get_user_input("Press Enter to continue...")
 
 def _handle_category_breakdown():
-    print("Category breakdown functionality not yet implemented.")
+    add_message("Category breakdown functionality not yet implemented.")
     get_user_input("Press Enter to continue...")
 
 def _handle_change_pin():
-    print("Change PIN functionality not yet implemented.")
+    add_message("--- Change PIN ---", immediate=True)
+    current_user = SessionManager.get_current_user()
+    if not current_user:
+        add_message("Error: No user is currently logged in.", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    old_pin = get_user_input("Enter your old PIN: ", hide_input=True)
+    service = UserManagementService()
+    if not service.authenticate_user(current_user.username, old_pin):
+        add_message("Error: Incorrect old PIN.", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    new_pin = get_user_input("Enter new PIN: ", hide_input=True)
+    new_pin_confirm = get_user_input("Confirm new PIN: ", hide_input=True)
+
+    if new_pin != new_pin_confirm:
+        add_message("Error: New PINs do not match.", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    is_valid, pin_msg = validate_pin(new_pin)
+    if not is_valid:
+        add_message(f"Error: {pin_msg}", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    if service.update_pin(current_user.username, new_pin):
+        add_message("PIN changed successfully.", immediate=True)
+    else:
+        add_message("Error: Failed to change PIN.", immediate=True)
     get_user_input("Press Enter to continue...")

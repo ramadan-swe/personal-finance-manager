@@ -2,6 +2,7 @@ from src.services.user_management import UserManagementService
 from src.services.session_manager import SessionManager
 from src.utils.prompt_toolkit_utils import get_user_input
 import json
+from src.utils.prompt_toolkit_utils import add_message # Import add_message
 
 def register():
     """Registers a new user account."""
@@ -77,9 +78,9 @@ def switch():
     user_account = service.authenticate_user(username, pin)
     if user_account:
         SessionManager.login_user(user_account)
-        print(f"Switched to user '{username}' successfully.")
+        add_message(f"Switched to user '{username}' successfully.")
     else:
-        print("Error: Invalid username or PIN.")
+        add_message("Error: Invalid username or PIN.")
 
 def logout():
     """Logs out the current user."""

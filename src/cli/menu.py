@@ -30,7 +30,7 @@ def start():
         else:
             is_valid, validated_choice = validate_integer(choice, min_val=1, max_val=len(menu_items))
             if is_valid:
-                selected_item = menu_items[validated_choice - 1]
+                selected_item = menu_items[int(validated_choice) - 1]
                 if selected_item.get("action").startswith("menu:"):
                     current_menu_id = navigate_to_submenu(current_menu_id, selected_item.get("action").split(":")[1])
                 elif selected_item.get("action").startswith("command:"):
