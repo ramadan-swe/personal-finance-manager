@@ -1,0 +1,72 @@
+[
+    {
+        "id": "main",
+        "label": "Main Menu",
+        "action": "",
+        "help_text": "Top level menu",
+        "parent_id": null
+    },
+    {
+        "id": "view_transactions",
+        "label": "View Transactions",
+        "action": "command:view_transactions",
+        "help_text": "View all recorded transactions",
+        "parent_id": "main"
+    },
+    {
+        "id": "add_transaction",
+        "label": "Add Transaction",
+        "action": "command:add_transaction",
+        "help_text": "Add a new financial transaction",
+        "parent_id": "main"
+    },
+    {
+        "id": "reports_menu",
+        "label": "Reports",
+        "action": "menu:reports",
+        "help_text": "Access financial reports",
+        "parent_id": "main"
+    },
+    {
+        "id": "settings_menu",
+        "label": "Settings",
+        "action": "menu:settings",
+        "help_text": "Configure application settings",
+        "parent_id": "main"
+    },
+    {
+        "id": "reports",
+        "label": "Reports Menu",
+        "action": "",
+        "help_text": "Financial reports",
+        "parent_id": "reports_menu"
+    },
+    {
+        "id": "monthly_report",
+        "label": "Monthly Report",
+        "action": "command:monthly_report",
+        "help_text": "Generate monthly financial report",
+        "parent_id": "reports_menu"
+    },
+    {
+        "id": "category_breakdown",
+        "label": "Category Breakdown",
+        "action": "command:category_breakdown",
+        "help_text": "View spending by category",
+        "parent_id": "reports_menu"
+    },
+    {
+        "id": "settings",
+        "label": "Settings Menu",
+        "action": "",
+        "help_text": "Application settings",
+        "parent_id": "settings_menu"
+    },
+    {
+        "id": "change_pin",
+        "label": "Change PIN",
+        "action": "command:change_pin",
+        "help_text": "Change user PIN",
+        "parent_id": "settings_menu"
+    }
+]

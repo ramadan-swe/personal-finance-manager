@@ -1,0 +1,10 @@
+[
+    {
+        "id": "eedc5875-82b0-4fda-85a2-c454d36667e4",
+        "amount": 100.0,
+        "date": "2025-10-26",
+        "type": "expense",
+        "description": "taxi",
+        "category": "Transport"
+    }
+]
