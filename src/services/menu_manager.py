@@ -4,12 +4,13 @@ from src.utils.input_validator import validate_number, validate_iso_date, valida
 from src.services.transaction_manager import TransactionManager
 from src.services.category_manager import get_categories, is_valid_category
 from src.services.session_manager import SessionManager
-from src.services.user_management import UserManagementService # Import UserManagementService
-from src.cli.user import update_profile_command, switch, logout # Import user management functions
+from src.services.user_management import UserManagementService
+from src.services.data_persistence import DataPersistenceService
+from src.cli.user import update_profile_command, switch, logout
+from src.cli.transaction import add_transaction_command, edit_transaction_command, delete_transaction_command
 
 # Global variables for menu management
 _navigation_stack = []
-_transaction_manager = TransactionManager() # Initialize once globally
 
 # Hardcoded menu structure
 _ALL_MENUS = {
@@ -34,8 +35,17 @@ _ALL_MENUS = {
         "items": [
             {"id": "change_pin", "label": "Change PIN", "action": "command:change_pin", "help_text": "Change user PIN"},
             {"id": "update_profile", "label": "Update Profile", "action": "command:update_profile", "help_text": "Update current user's profile information"},
+            {"id": "data_management", "label": "Data Management", "action": "menu:data_management", "help_text": "Export, import, or restore data"},
             {"id": "switch_account", "label": "Switch Account", "action": "command:switch_account", "help_text": "Switch to another user account"},
             {"id": "logout", "label": "Logout", "action": "command:logout", "help_text": "Log out the current user"},
+        ]
+    },
+    "data_management": {
+        "label": "Data Management",
+        "items": [
+            {"id": "export_data", "label": "Export Data", "action": "command:export_data", "help_text": "Export transactions to a file"},
+            {"id": "import_data", "label": "Import Data", "action": "command:import_data", "help_text": "Import transactions from a file"},
+            {"id": "restore_data", "label": "Restore from Backup", "action": "command:restore_data", "help_text": "Restore transactions from a backup"},
         ]
     }
 }
@@ -83,90 +93,45 @@ def get_contextual_help(menu_id, item_id=None):
         help_text += "\nQ: Exit, B: Back, H: Help"
         return help_text
 
-def execute_command_action(action_string):
+def execute_command_action(action_string, transaction_manager):
     command_name = action_string.split(":")[1]
     current_user = SessionManager.get_current_user()
     if not current_user:
         add_message("Error: No user is currently logged in. Please log in first.")
         return
     user_id = current_user.username
-    if command_name == "add_transaction":
-        _handle_add_transaction(user_id)
-    elif command_name == "view_transactions":
-        _handle_view_transactions(user_id)
-    elif command_name == "monthly_report":
-        _handle_monthly_report()
-    elif command_name == "category_breakdown":
-        _handle_category_breakdown()
-    elif command_name == "change_pin":
-        _handle_change_pin()
-    elif command_name == "update_profile":
-        update_profile_command() # Call the standalone function from src/cli/user.py
-    elif command_name == "switch_account":
-        switch() # Call the standalone function from src/cli/user.py
-    elif command_name == "logout":
-        logout() # Call the standalone function from src/cli/user.py
-    else:
-        add_message(f"Unknown command: {command_name}")
+    match command_name:
+        case "add_transaction":
+            add_transaction_command(transaction_manager)
+        case "view_transactions":
+            _handle_view_transactions(user_id, transaction_manager)
+        case "edit_transaction":
+            _handle_edit_transaction(transaction_manager)
+        case "delete_transaction":
+            _handle_delete_transaction(transaction_manager)
+        case "monthly_report":
+            _handle_monthly_report()
+        case "category_breakdown":
+            _handle_category_breakdown()
+        case "change_pin":
+            _handle_change_pin()
+        case "update_profile":
+            update_profile_command()  # Call the standalone function from src/cli/user.py
+        case "switch_account":
+            switch()  # Call the standalone function from src/cli/user.py
+        case "logout":
+            logout()  # Call the standalone function from src/cli/user.py
+        case "export_data":
+            _handle_export_data(transaction_manager)
+        case "import_data":
+            _handle_import_data(transaction_manager)
+        case "restore_data":
+            _handle_restore_data(transaction_manager)
+        case _:
+            add_message(f"Unknown command: {command_name}")
 
-def _handle_add_transaction(user_id):
-    add_message("--- Add New Transaction ---")
-    
-    while True:
-        amount_str = get_user_input("Amount: ")
-        is_valid, amount = validate_number(amount_str)
-        if is_valid:
-            break
-        add_message(f"Error: {amount}")
-
-    while True:
-        date_str = get_user_input(f"Date (YYYY-MM-DD) [default: {date.today().isoformat()}]: ")
-        if not date_str:
-            transaction_date = date.today().isoformat()
-            break
-        is_valid, transaction_date = validate_iso_date(date_str)
-        if is_valid:
-            break
-        add_message(f"Error: {transaction_date}")
-    
-    while True:
-        type_str = get_user_input("Type (income/expense): ")
-        is_valid, transaction_type = validate_type(type_str)
-        if is_valid:
-            break
-        add_message(f"Error: {transaction_type}")
-
-    while True:
-        description = get_user_input("Description: ")
-        is_valid, description = validate_description(description)
-        if is_valid:
-            break
-        add_message(f"Error: {description}")
-
-    while True:
-        categories = get_categories()
-        add_message(f"Available Categories: {', '.join(categories)}", immediate=True)
-        category = get_user_input("Category (leave empty for 'Uncategorized'): ")
-        if not category:
-            category = "Uncategorized"
-            break
-        is_valid, category_error = validate_category(category)
-        if not is_valid:
-            add_message(f"Error: {category_error}")
-            continue
-        if not is_valid_category(category):
-            add_message(f"Error: Invalid category '{category}'")
-            continue
-        break
-
-    if _transaction_manager.add_transaction(amount, transaction_date, transaction_type, description, category, user_id):
-        add_message("Transaction added successfully.")
-    else:
-        add_message("Failed to add transaction.")
-    get_user_input("Press Enter to continue...")
-
-def _handle_view_transactions(user_id):
-    transactions = _transaction_manager.get_all_transactions(user_id)
+def _handle_view_transactions(user_id, transaction_manager):
+    transactions = transaction_manager.get_all_transactions(user_id)
     if not transactions:
         add_message("No transactions found.", immediate=True)
     else:
@@ -178,8 +143,8 @@ def _handle_view_transactions(user_id):
         amount_width = 12
         description_width = 40 # Added description column
 
-        header = (f"{'ID':<{id_width}} | {'Date':<{date_width}} | {'Type':<{type_width}} | "
-                  f"{'Category':<{category_width}} | {'Amount':>{amount_width}} | {'Description':<{description_width}}")
+        header = (f"{ 'ID':<{id_width}} | { 'Date':<{date_width}} | { 'Type':<{type_width}} | "
+                  f"{ 'Category':<{category_width}} | { 'Amount':>{amount_width}} | { 'Description':<{description_width}}")
         
         separator = "=" * (id_width + date_width + type_width + category_width + amount_width + description_width + (5 * 3)) # 5 for '|' and spaces
 
@@ -189,9 +154,9 @@ def _handle_view_transactions(user_id):
 
         for t in transactions:
             # Truncate ID for display
-            display_id = t.id[:id_width-3] + "..." if len(t.id) > id_width else t.id
+            display_id = str(t.id)[:id_width-3] + "..." if len(str(t.id)) > id_width else str(t.id)
             # Format amount to 2 decimal places and right-align
-            formatted_amount = f"${t.amount:,.2f}"
+            formatted_amount = f"{t.currency.symbol}{t.amount:,.2f}"
             # Truncate description if too long
             display_description = t.description[:description_width] + "..." if len(t.description) > description_width else t.description
 
@@ -199,6 +164,23 @@ def _handle_view_transactions(user_id):
                    f"{t.category:<{category_width}} | {formatted_amount:>{amount_width}} | {display_description:<{description_width}}")
             add_message(row, immediate=True)
         add_message(separator, immediate=True)
+
+    choice = get_user_input("\nType 'e' to edit, 'd' to delete, or 'b' to go back: ").lower()
+    if choice == 'e':
+        _handle_edit_transaction(transaction_manager)
+    elif choice == 'd':
+        _handle_delete_transaction(transaction_manager)
+    else:
+        return
+
+def _handle_edit_transaction(transaction_manager):
+    transaction_id = get_user_input("Enter the ID of the transaction to edit: ")
+    edit_transaction_command(transaction_id, transaction_manager)
+    get_user_input("Press Enter to continue...")
+
+def _handle_delete_transaction(transaction_manager):
+    transaction_id = get_user_input("Enter the ID of the transaction to delete: ")
+    delete_transaction_command(transaction_id, transaction_manager)
     get_user_input("Press Enter to continue...")
 
 def _handle_monthly_report():
@@ -242,4 +224,75 @@ def _handle_change_pin():
         add_message("PIN changed successfully.", immediate=True)
     else:
         add_message("Error: Failed to change PIN.", immediate=True)
+    get_user_input("Press Enter to continue...")
+
+def _handle_export_data(transaction_manager):
+    file_path = get_user_input("Enter the full path for the export file (e.g., /path/to/export.json): ")
+    file_format = get_user_input("Enter the format (json or csv): ").lower()
+
+    if not file_format in ['json', 'csv']:
+        add_message("Invalid format. Please choose 'json' or 'csv'.")
+        get_user_input("Press Enter to continue...")
+        return
+
+    current_user = SessionManager.get_current_user()
+    if not current_user:
+        add_message("Error: No user is currently logged in. Please log in to export data.")
+        get_user_input("Press Enter to continue...")
+        return
+    transactions = transaction_manager.get_all_transactions(current_user.username)
+    
+    success, message = transaction_manager.persistence.data_persistence_service.export_data(transactions, file_format, file_path)
+
+    add_message(message)
+    get_user_input("Press Enter to continue...")
+
+def _handle_import_data(transaction_manager):
+    file_path = get_user_input("Enter the full path for the import file (e.g., /path/to/import.json): ")
+    file_format = get_user_input("Enter the format (json or csv): ").lower()
+
+    if not file_format in ['json', 'csv']:
+        add_message("Invalid format. Please choose 'json' or 'csv'.")
+        get_user_input("Press Enter to continue...")
+        return
+
+    current_user = SessionManager.get_current_user()
+    if not current_user:
+        add_message("Error: No user is currently logged in. Please log in to import data.")
+        get_user_input("Press Enter to continue...")
+        return
+    success, message = transaction_manager.persistence.data_persistence_service.import_data(file_format, file_path, current_user.username)
+
+    add_message(message)
+    get_user_input("Press Enter to continue...")
+
+def _handle_restore_data(transaction_manager):
+    backups = transaction_manager.persistence.data_persistence_service.get_backups()
+    if not backups:
+        add_message("No backups found.")
+        get_user_input("Press Enter to continue...")
+        return
+
+    add_message("Available backups:")
+    for i, backup in enumerate(backups):
+        add_message(f"{i+1}. {backup}")
+
+    choice_str = get_user_input("Enter the number of the backup to restore: ")
+    try:
+        choice = int(choice_str)
+        if not (1 <= choice <= len(backups)):
+            raise ValueError()
+    except ValueError:
+        add_message("Invalid choice.")
+        get_user_input("Press Enter to continue...")
+        return
+
+    selected_backup = backups[choice-1]
+    success, message = transaction_manager.persistence.data_persistence_service.restore_from_backup(selected_backup)
+    
+    add_message(message)
+    if success:
+        # Reload transactions after restoring
+        transaction_manager.persistence._load_transactions()
+
     get_user_input("Press Enter to continue...")

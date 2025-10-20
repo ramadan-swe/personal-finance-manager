@@ -3,21 +3,26 @@ from src.cli.user import register, login
 from src.models.user_account import UserAccountPersistence
 from src.services.session_manager import SessionManager
 from src.utils.prompt_toolkit_utils import get_user_input
+from src.services.data_persistence import DataPersistenceService
+from src.services.transaction_manager import TransactionManager
 
 from src.utils.prompt_toolkit_utils import get_user_input, clear_screen, add_message, display_messages
 
 def _run_initial_setup_menu():
     user_persistence = UserAccountPersistence()
+    data_persistence_service = DataPersistenceService()
+    transaction_manager = TransactionManager(data_persistence_service)
 
     while True:
         clear_screen()
         accounts = user_persistence.get_all_accounts()
 
         if not accounts:
-            add_message("--- Welcome to Personal Finance Manager ---")
-            add_message("No users registered. Please register to begin.")
-            add_message("1. Register New User")
-            add_message("Q. Exit")
+            add_message("""
+--- Welcome to Personal Finance Manager ---
+No users registered. Please register to begin.
+1. Register New User
+Q. Exit""")
             display_messages() # Display messages before getting input
             choice = get_user_input("Enter your choice: ").strip().upper()
 
@@ -34,10 +39,11 @@ def _run_initial_setup_menu():
                 add_message("Invalid choice. Please try again.")
 
         else:
-            add_message("--- Welcome to Personal Finance Manager --- ")
-            add_message("1. Login")
-            add_message("2. Register")
-            add_message("Q. Exit")
+            add_message("""
+--- Welcome to Personal Finance Manager ---
+1. Login
+2. Register
+Q. Exit""")
             display_messages() # Display messages before getting input
             choice = get_user_input("Enter your choice: ").strip().upper()
 
@@ -63,7 +69,7 @@ def _run_initial_setup_menu():
         current_user = SessionManager.get_current_user()
         if current_user: # Ensure current_user is not None before accessing its attributes
             add_message(f"Welcome, {current_user.username}!")
-        start()
+        start(transaction_manager) # Pass the shared transaction_manager
     else:
         add_message("Exiting Personal Finance Manager.")
 

@@ -82,5 +82,19 @@
             "short_name": "USD",
             "symbol": "$"
         }
+    },
+    {
+        "id": "TX009",
+        "amount": 213.0,
+        "date": "2025-10-26",
+        "type": "expense",
+        "description": "asas2",
+        "category": "Uncategorized",
+        "user_id": "ahmed",
+        "payment_method": "credit",
+        "currency": {
+            "short_name": "USD",
+            "symbol": "$"
+        }
     }
 ]

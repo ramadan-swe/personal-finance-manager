@@ -3,7 +3,7 @@ from src.services.session_manager import SessionManager
 from src.utils.prompt_toolkit_utils import get_user_input, display_menu
 from src.utils.input_validator import validate_integer
 
-def start():
+def start(transaction_manager):
     """Starts the main hierarchical menu."""
     initialize_default_menu() # Initialize menu items
     current_menu_id = "main"
@@ -34,7 +34,7 @@ def start():
                 if selected_item.get("action").startswith("menu:"):
                     current_menu_id = navigate_to_submenu(current_menu_id, selected_item.get("action").split(":")[1])
                 elif selected_item.get("action").startswith("command:"):
-                    execute_command_action(selected_item.get("action"))
+                    execute_command_action(selected_item.get("action"), transaction_manager)
                 else:
                     print(f"Unknown action type: {selected_item.get('action')}")
             else:

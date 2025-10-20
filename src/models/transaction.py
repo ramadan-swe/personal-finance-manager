@@ -1,75 +1,98 @@
-# src/models/transaction.py
 import json
 import os
-import uuid
-from datetime import datetime
+from math import floor, log10
+from enum import Enum
+from src.services.data_persistence import DataPersistenceService # Import DataPersistenceService
+
+class Currency:
+    def __init__(self, short_name, symbol):
+        self.short_name = short_name
+        self.symbol = symbol
+
+    def to_dict(self):
+        return {"short_name": self.short_name, "symbol": self.symbol}
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["short_name"], data["symbol"])
+
+class Currencies:
+    USD = Currency("USD", "$")
+    EUR = Currency("EUR", "€")
+    GBP = Currency("GBP", "£")
+    JPY = Currency("JPY", "¥")
+    EGP = Currency("EGP", "E£")
+
+    @classmethod
+    def get_all(cls):
+        return [cls.USD, cls.EUR, cls.GBP, cls.JPY, cls.EGP]
+
+    @classmethod
+    def from_short_name(cls, short_name):
+        for currency in cls.get_all():
+            if currency.short_name == short_name:
+                return currency
+        return None
+
+class PaymentMethod(Enum):
+    DEBIT = "debit"
+    CREDIT = "credit"
+    CASH = "cash"
 
 class Transaction:
-    def __init__(self, amount, date, type, description, category, user_id, id=None):
-        self.id = id if id else str(uuid.uuid4())
+    def __init__(self, amount, date, type, description, category, user_id, payment_method, currency, id=None):
+        self.id = id
         self.amount = float(amount)
         self.date = date # Store as ISO format string YYYY-MM-DD
         self.type = type # "income" or "expense"
         self.description = description
         self.category = category
         self.user_id = user_id
+        self.payment_method = payment_method
+        self.currency = currency
 
-    def to_dict(self):
-        return {
+    def to_dict(self, target='json'):
+        d = {
             "id": self.id,
             "amount": self.amount,
             "date": self.date,
             "type": self.type,
             "description": self.description,
             "category": self.category,
-            "user_id": self.user_id
+            "user_id": self.user_id,
+            "payment_method": self.payment_method.value if self.payment_method else None,
         }
+        if target == 'csv':
+            d['currency'] = self.currency.short_name if self.currency else None
+        else: # json
+            d['currency'] = self.currency.to_dict() if self.currency else None
+        return d
 
     @classmethod
     def from_dict(cls, data):
-        return cls(data["amount"], data["date"], data["type"], data["description"], data["category"], data.get("user_id"), data["id"])
+        currency_val = data.get('currency')
+        currency = None
+        if isinstance(currency_val, dict):
+            currency = Currency.from_dict(currency_val)
+        elif isinstance(currency_val, str):
+            currency = Currencies.from_short_name(currency_val)
 
-class TransactionPersistence:
-    def __init__(self, storage_file="transactions.json"):
-        self.storage_file = storage_file
-        self._load_transactions()
+        payment_method_str = data.get("payment_method")
+        payment_method = None
+        if payment_method_str:
+            try:
+                payment_method = PaymentMethod(payment_method_str)
+            except ValueError:
+                payment_method = None
 
-    def _load_transactions(self):
-        if os.path.exists(self.storage_file):
-            with open(self.storage_file, 'r') as f:
-                data = json.load(f)
-                self.transactions = {t_data["id"]: Transaction.from_dict(t_data) for t_data in data}
-        else:
-            self.transactions = {}
-
-    def _save_transactions(self):
-        with open(self.storage_file, 'w') as f:
-            json.dump([t.to_dict() for t in self.transactions.values()], f, indent=4)
-
-    def create_transaction(self, transaction):
-        if transaction.id in self.transactions:
-            # This should ideally not happen with uuid4, but as a safeguard
-            return False
-        self.transactions[transaction.id] = transaction
-        self._save_transactions()
-        return True
-
-    def get_transaction(self, transaction_id):
-        return self.transactions.get(transaction_id)
-
-    def get_all_transactions(self):
-        return list(self.transactions.values())
-
-    def update_transaction(self, transaction):
-        if transaction.id not in self.transactions:
-            return False
-        self.transactions[transaction.id] = transaction
-        self._save_transactions()
-        return True
-
-    def delete_transaction(self, transaction_id):
-        if transaction_id in self.transactions:
-            del self.transactions[transaction_id]
-            self._save_transactions()
-            return True
-        return False
+        return cls(
+            amount=float(data["amount"]),
+            date=data["date"],
+            type=data["type"],
+            description=data["description"],
+            category=data["category"],
+            user_id=data.get("user_id"),
+            payment_method=payment_method,
+            currency=currency,
+            id=data.get("id")
+        )

@@ -1,126 +1,202 @@
+from datetime import datetime
 from src.services.transaction_manager import TransactionManager
-from src.models.transaction import Transaction
-from src.utils.validators import validate_amount, validate_date, validate_type, validate_description, validate_category
-from src.services.category_manager import get_categories, is_valid_category # Updated import
-from src.utils.prompt_toolkit_utils import get_user_input # Added import
+from src.models.transaction import Currencies, PaymentMethod
+from src.utils.validators import validate_amount, validate_date, validate_type, validate_description, validate_category, validate_payment_method, validate_currency
+from src.services.category_manager import get_categories, is_valid_category
+from src.utils.prompt_toolkit_utils import get_user_input, add_message, CANCEL_COMMAND
+from src.services.session_manager import SessionManager
+from src.services.data_persistence import DataPersistenceService
 
-def add():
+def _get_validated_input(prompt, default_value=None, validator_func=None, allow_empty=False, allow_skip=False, is_edit_mode=False, display_current_or_default=True, error_message="Invalid input."):
+    while True:
+        prompt_suffix = ""
+        if display_current_or_default:
+            if is_edit_mode:
+                prompt_suffix = f' (current: {default_value}, type \'cancel\' to return to main menu, leave blank to keep current)'
+            else:
+                prompt_suffix = f' (default: {default_value}, type \'cancel\' to return to main menu)'
+        else:
+            prompt_suffix = ' (type \'cancel\' to return to main menu)'
+
+        input_str = get_user_input(f'{prompt}{prompt_suffix}: ')
+        if input_str.lower() == CANCEL_COMMAND:
+            return CANCEL_COMMAND
+        
+        if not input_str and allow_skip:
+            return None # Indicates that the user wants to keep the current value
+
+        if not input_str and not allow_empty and default_value is not None:
+            input_str = default_value
+
+        if validator_func and input_str is not None:
+            is_valid, validated_value = validator_func(input_str)
+            if not is_valid:
+                add_message(f"Error: {validated_value}")
+            else:
+                return validated_value
+        elif input_str is not None:
+            return input_str
+        else:
+            add_message(error_message)
+
+
+def add_transaction_command(manager: TransactionManager):
     """Adds a new financial transaction."""
-    amount = get_user_input('Amount of the transaction: ')
-    date_str = get_user_input('Date of the transaction (YYYY-MM-DD): ')
-    type_str = get_user_input('Type of the transaction (income/expense): ')
-    description = get_user_input('Description of the transaction: ')
-    category = get_user_input('Category of the transaction: ')
+    current_user = SessionManager.get_current_user()
+    if not current_user:
+        add_message("Error: No user is currently logged in. Please log in to add transactions.")
+        return
+    user_id = current_user.username
 
-    is_valid, validated_amount = validate_amount(amount)
-    if not is_valid:
-        print(f"Error: {validated_amount}")
+    amount = None
+    while amount is None:
+        amount_input = _get_validated_input('Amount of the transaction', validator_func=validate_amount, display_current_or_default=False)
+        if amount_input == CANCEL_COMMAND:
+            add_message("Transaction addition cancelled.")
+            return
+        if amount_input is not None:
+            amount = amount_input
+
+    default_date = datetime.now().strftime('%Y-%m-%d')
+    date_str = _get_validated_input(f'Date of the transaction (YYYY-MM-DD)', default_date, validate_date, is_edit_mode=False, display_current_or_default=True)
+    if date_str == CANCEL_COMMAND:
+        add_message("Transaction addition cancelled.")
         return
 
-    is_valid, validated_date = validate_date(date_str)
-    if not is_valid:
-        print(f"Error: {validated_date}")
+    default_type = 'expense'
+    type_str = _get_validated_input('Type of the transaction (income/expense)', default_type, validate_type, is_edit_mode=False, display_current_or_default=True)
+    if type_str == CANCEL_COMMAND:
+        add_message("Transaction addition cancelled.")
         return
 
-    is_valid, validated_type = validate_type(type_str)
-    if not is_valid:
-        print(f"Error: {validated_type}")
+    description = _get_validated_input('Description of the transaction', '', validate_description, allow_empty=True, is_edit_mode=False, display_current_or_default=False)
+    if description == CANCEL_COMMAND:
+        add_message("Transaction addition cancelled.")
         return
 
-    is_valid, validated_description = validate_description(description)
-    if not is_valid:
-        print(f"Error: {validated_description}")
+    default_category = 'Uncategorized'
+    category = None
+    while category is None:
+        category_input = _get_validated_input('Category of the transaction', default_category, validate_category, is_edit_mode=False, display_current_or_default=True)
+        if category_input == CANCEL_COMMAND:
+            add_message("Transaction addition cancelled.")
+            return
+        if not is_valid_category(category_input):
+            add_message(f"Error: Invalid category '{category_input}'. Use 'finance category list' to see available categories.")
+        else:
+            category = category_input
+
+    default_payment_method = 'debit'
+    payment_method_str = _get_validated_input('Payment method (debit, credit, cash)', default_payment_method, validate_payment_method, is_edit_mode=False, display_current_or_default=True)
+    if payment_method_str == CANCEL_COMMAND:
+        add_message("Transaction addition cancelled.")
         return
 
-    is_valid, validated_category = validate_category(category)
-    if not is_valid:
-        print(f"Error: {validated_category}")
-        return
-    if not is_valid_category(validated_category): # Updated call
-        print(f"Error: Invalid category '{validated_category}'. Use 'finance category list' to see available categories.")
+    default_currency = 'USD'
+    currency_str = _get_validated_input('Currency (e.g., USD, EUR, EGP)', default_currency, validate_currency, is_edit_mode=False, display_current_or_default=True)
+    if currency_str == CANCEL_COMMAND:
+        add_message("Transaction addition cancelled.")
         return
 
-    manager = TransactionManager()
-    if manager.add_transaction(validated_amount, validated_date, validated_type, validated_description, validated_category):
-        print("Transaction added successfully.")
+    if manager.add_transaction(amount, date_str, type_str, description, category, user_id, payment_method_str, currency_str):
+        add_message("Transaction added successfully.")
     else:
-        print("Error: Failed to add transaction.")
+        add_message("Error: Failed to add transaction.")
 
-def edit():
+def edit_transaction_command(transaction_id=None, manager=None):
     """Edits an existing financial transaction."""
-    id = get_user_input('ID of the transaction to edit: ')
-    amount = get_user_input('New amount of the transaction (leave empty to keep current): ')
-    date_str = get_user_input('New date of the transaction (YYYY-MM-DD, leave empty to keep current): ')
-    type_str = get_user_input('New type of the transaction (income/expense, leave empty to keep current): ')
-    description = get_user_input('New description of the transaction (leave empty to keep current): ')
-    category = get_user_input('New category of the transaction (leave empty to keep current): ')
+    if manager is None:
+        add_message("Error: TransactionManager not provided to edit_transaction_command.")
+        return
 
-    manager = TransactionManager()
-    existing_transaction = manager.get_transaction(id)
+    if transaction_id is None:
+        transaction_id = get_user_input('ID of the transaction to edit: ')
+    
+    existing_transaction = manager.get_transaction(transaction_id)
 
     if not existing_transaction:
-        print(f"Error: Transaction with ID '{id}' not found.")
+        add_message(f"Error: Transaction with ID '{transaction_id}' not found.")
         return
 
     updates = {}
-    if amount:
-        is_valid, validated_amount = validate_amount(amount)
-        if not is_valid:
-            print(f"Error: {validated_amount}")
-            return
-        updates['amount'] = validated_amount
 
-    if date_str:
-        is_valid, validated_date = validate_date(date_str)
-        if not is_valid:
-            print(f"Error: {validated_date}")
-            return
-        updates['date'] = validated_date
+    # Refactor edit_transaction_command to use _get_validated_input
+    amount = _get_validated_input(f'New amount', existing_transaction.amount, validate_amount, allow_skip=True, is_edit_mode=True, display_current_or_default=True)
+    if amount == CANCEL_COMMAND:
+        add_message("Transaction edit cancelled.")
+        return
+    if amount is not None:
+        updates['amount'] = amount
 
-    if type_str:
-        is_valid, validated_type = validate_type(type_str)
-        if not is_valid:
-            print(f"Error: {validated_type}")
-            return
-        updates['type'] = validated_type
+    date_str = _get_validated_input(f'New date (YYYY-MM-DD)', existing_transaction.date, validate_date, allow_skip=True, is_edit_mode=True, display_current_or_default=True)
+    if date_str == CANCEL_COMMAND:
+        add_message("Transaction edit cancelled.")
+        return
+    if date_str is not None:
+        updates['date'] = date_str
 
-    if description:
-        is_valid, validated_description = validate_description(description)
-        if not is_valid:
-            print(f"Error: {validated_description}")
-            return
-        updates['description'] = validated_description
+    type_str = _get_validated_input(f'New type (income/expense)', existing_transaction.type, validate_type, allow_skip=True, is_edit_mode=True, display_current_or_default=True)
+    if type_str == CANCEL_COMMAND:
+        add_message("Transaction edit cancelled.")
+        return
+    if type_str is not None:
+        updates['type'] = type_str
 
-    if category:
-        is_valid, validated_category = validate_category(category)
-        if not is_valid:
-            print(f"Error: {validated_category}")
+    description = _get_validated_input(f'New description', existing_transaction.description, validate_description, allow_empty=True, allow_skip=True, is_edit_mode=True, display_current_or_default=True)
+    if description == CANCEL_COMMAND:
+        add_message("Transaction edit cancelled.")
+        return
+    if description is not None:
+        updates['description'] = description
+
+    category = _get_validated_input(f'New category', existing_transaction.category, validate_category, allow_skip=True, is_edit_mode=True, display_current_or_default=True)
+    if category == CANCEL_COMMAND:
+        add_message("Transaction edit cancelled.")
+        return
+    if category is not None:
+        if not is_valid_category(category):
+            add_message(f"Error: Invalid category '{category}'. Use 'finance category list' to see available categories.")
             return
-        if not is_valid_category(validated_category): # Updated call
-            print(f"Error: Invalid category '{validated_category}'. Use 'finance category list' to see available categories.")
-            return
-        updates['category'] = validated_category
+        updates['category'] = category
+
+    payment_method_str = _get_validated_input(f'New payment method (debit, credit, cash)', existing_transaction.payment_method.value, validate_payment_method, allow_skip=True, is_edit_mode=True, display_current_or_default=True)
+    if payment_method_str == CANCEL_COMMAND:
+        add_message("Transaction edit cancelled.")
+        return
+    if payment_method_str is not None:
+        updates['payment_method'] = payment_method_str
+
+    currency_str = _get_validated_input(f'New currency (e.g., USD, EUR, EGP)', existing_transaction.currency.short_name, validate_currency, allow_skip=True, is_edit_mode=True, display_current_or_default=True)
+    if currency_str == CANCEL_COMMAND:
+        add_message("Transaction edit cancelled.")
+        return
+    if currency_str is not None:
+        updates['currency'] = currency_str
 
     if not updates:
-        print("No updates provided.")
+        add_message("No updates provided.")
         return
 
-    if manager.update_transaction(id, **updates):
-        print(f"Transaction '{id}' updated successfully.")
+    if manager.update_transaction(transaction_id, **updates):
+        add_message(f"Transaction '{transaction_id}' updated successfully.")
     else:
-        print(f"Error: Failed to update transaction '{id}'.")
+        add_message(f"Error: Failed to update transaction '{transaction_id}'.")
 
-def delete():
+def delete_transaction_command(transaction_id=None, manager=None):
     """Deletes an existing financial transaction."""
-    id = get_user_input('ID of the transaction to delete: ')
-    
-    confirm = get_user_input(f"Are you sure you want to delete transaction '{id}'? This action cannot be undone. (yes/no): ").lower()
-    if confirm != 'yes':
-        print("Deletion cancelled.")
+    if manager is None:
+        add_message("Error: TransactionManager not provided to delete_transaction_command.")
         return
 
-    manager = TransactionManager()
-    if manager.delete_transaction(id):
-        print(f"Transaction '{id}' deleted successfully.")
+    if transaction_id is None:
+        transaction_id = get_user_input('ID of the transaction to delete: ')
+    
+    confirm = get_user_input(f"Are you sure you want to delete transaction '{transaction_id}'? This action cannot be undone. (yes/no): ").lower()
+    if confirm != 'yes':
+        add_message("Deletion cancelled.")
+        return
+
+    if manager.delete_transaction(transaction_id):
+        add_message(f"Transaction '{transaction_id}' deleted successfully.")
     else:
-        print(f"Error: Transaction '{id}' not found or failed to delete.")
+        add_message(f"Error: Transaction '{transaction_id}' not found or failed to delete.")

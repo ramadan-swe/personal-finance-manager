@@ -1,5 +1,5 @@
-# src/utils/validators.py
 from datetime import datetime
+from src.models.transaction import PaymentMethod, Currencies
 
 def validate_amount(amount):
     try:
@@ -35,3 +35,15 @@ def validate_category(category):
     if not isinstance(category, str) or not category.strip():
         return False, "Category cannot be empty."
     return True, category.strip()
+
+def validate_payment_method(payment_method):
+    try:
+        return True, PaymentMethod(payment_method.lower())
+    except ValueError:
+        return False, f"Invalid payment method. Allowed values are: {[pm.value for pm in PaymentMethod]}."
+
+def validate_currency(currency_short_name):
+    currency = Currencies.from_short_name(currency_short_name.upper())
+    if currency:
+        return True, currency
+    return False, f"Invalid currency. Allowed values are: {[c.short_name for c in Currencies.get_all()]}."

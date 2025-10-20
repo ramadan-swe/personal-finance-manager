@@ -82,5 +82,19 @@
             "short_name": "USD",
             "symbol": "$"
         }
+    },
+    {
+        "id": "TX009",
+        "amount": 2142.0,
+        "date": "2025-10-26",
+        "type": "expense",
+        "description": "asab,2",
+        "category": "Uncategorized",
+        "user_id": "ahmed",
+        "payment_method": "debit",
+        "currency": {
+            "short_name": "USD",
+            "symbol": "$"
+        }
     }
 ]

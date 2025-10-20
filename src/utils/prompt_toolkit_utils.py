@@ -4,6 +4,8 @@ from prompt_toolkit.shortcuts import print_formatted_text # Import print_formatt
 
 _messages = []
 
+CANCEL_COMMAND = "cancel"
+
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -11,7 +13,7 @@ def add_message(message, immediate=False):
     if immediate:
         print_formatted_text(message)
     else:
-        _messages.append(message)
+        _messages.extend(message.splitlines())
 
 def display_messages():
     if _messages:

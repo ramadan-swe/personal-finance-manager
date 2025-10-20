@@ -1,6 +1,6 @@
 # src/services/category_manager.py
 
-_categories = ["Food", "Transport", "Housing", "Entertainment", "Salary", "Investments", "Utilities", "Healthcare", "Education", "Miscellaneous"]
+_categories = ["Food", "Transport", "Housing", "Entertainment", "Salary", "Investments", "Utilities", "Healthcare", "Education", "Miscellaneous", "Uncategorized"]
 
 def get_categories():
     return sorted(_categories)
