@@ -5,6 +5,52 @@ from src.services.session_manager import SessionManager
 from src.utils.prompt_toolkit_utils import get_user_input
 
 from src.utils.prompt_toolkit_utils import get_user_input, clear_screen, add_message, display_messages
+from src.services.reporting import generate_dashboard_summary, generate_monthly_report
+from src.services.transaction_manager import TransactionManager
+from datetime import datetime
+from decimal import Decimal, getcontext
+
+getcontext().prec = 28
+
+
+def _render_dashboard_box(user_display: str, period_display: str, total_income: float, total_expenses: float, net_savings: float, current_balance: float, top_categories: list):
+    """Return a list of lines representing an ASCII dashboard box."""
+    # Prepare content lines
+    lines = []
+    lines.append(f"User: {user_display}")
+    lines.append(f"Period: {period_display}")
+    lines.append("")
+    lines.append(f"Total Income:        ${total_income:,.2f}")
+    lines.append(f"Total Expenses:      ${total_expenses:,.2f}")
+    lines.append(f"Net Savings:         ${net_savings:,.2f}")
+    lines.append("")
+    lines.append(f"Current Balance:     ${current_balance:,.2f}")
+
+    # Determine box width based on longest line
+    content_width = max(len(l) for l in lines)
+    title = "PERSONAL FINANCE MANAGER v1.0"
+    content_width = max(content_width, len(title))
+    box_width = content_width + 4
+
+    horiz = "─" * box_width
+    top = f"┌{ '─' * box_width }┐"
+    title_line = f"│{title.center(box_width)}│"
+    sep = f"├{ '─' * box_width }┤"
+    bottom = f"└{ '─' * box_width }┘"
+
+    out = [top, title_line, sep]
+    for ln in lines:
+        out.append(f"│{ln.ljust(box_width)}│")
+    out.append(bottom)
+
+    # Add top categories block after the box
+    out.append("")
+    out.append("Top Spending Categories:")
+    for idx, item in enumerate(top_categories, start=1):
+        # item: dict with category, amount, percent
+        out.append(f"{idx}. {item['category']:<20} ${item['amount']:>8,.2f}   ({item['percent']:>4.1f}%)")
+
+    return out
 
 def _run_initial_setup_menu():
     user_persistence = UserAccountPersistence()
@@ -63,6 +109,8 @@ def _run_initial_setup_menu():
         current_user = SessionManager.get_current_user()
         if current_user: # Ensure current_user is not None before accessing its attributes
             add_message(f"Welcome, {current_user.username}!")
+
+            # Dashboard will be rendered by the main menu when it first displays
         start()
     else:
         add_message("Exiting Personal Finance Manager.")

@@ -70,5 +70,14 @@
         "description": "asgkvl",
         "category": "Uncategorized",
         "user_id": "ahmed"
+    },
+    {
+        "id": "89e6b755-bdb3-48bd-8f13-91ea36a3ed8e",
+        "amount": 500.0,
+        "date": "2025-10-27",
+        "type": "expense",
+        "description": "purchase",
+        "category": "Food",
+        "user_id": "ahmed"
     }
 ]

@@ -56,6 +56,13 @@
         "parent_id": "reports_menu"
     },
     {
+        "id": "spending_trends",
+        "label": "Spending Trends",
+        "action": "command:spending_trends",
+        "help_text": "View spending trends for the current month",
+        "parent_id": "reports_menu"
+    },
+    {
         "id": "settings",
         "label": "Settings Menu",
         "action": "",

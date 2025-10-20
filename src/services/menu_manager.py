@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from src.utils.prompt_toolkit_utils import display_menu, get_user_input, add_message, print_formatted_text
 from src.utils.input_validator import validate_number, validate_iso_date, validate_type, validate_description, validate_category, validate_pin
 from src.services.transaction_manager import TransactionManager
@@ -6,6 +6,9 @@ from src.services.category_manager import get_categories, is_valid_category
 from src.services.session_manager import SessionManager
 from src.services.user_management import UserManagementService # Import UserManagementService
 from src.cli.user import update_profile_command, switch, logout # Import user management functions
+from src.services.reporting import generate_monthly_report, generate_dashboard_summary
+from decimal import Decimal
+import calendar
 
 # Global variables for menu management
 _navigation_stack = []
@@ -26,7 +29,8 @@ _ALL_MENUS = {
         "label": "Reports Menu",
         "items": [
             {"id": "monthly_report", "label": "Monthly Report", "action": "command:monthly_report", "help_text": "Generate monthly financial report"},
-            {"id": "category_breakdown", "label": "Category Breakdown", "action": "command:category_breakdown", "help_text": "View spending by category"},
+                {"id": "category_breakdown", "label": "Category Breakdown", "action": "command:category_breakdown", "help_text": "View spending by category"},
+                {"id": "spending_trends", "label": "Spending Trends", "action": "command:spending_trends", "help_text": "View spending trends for the current month"},
         ]
     },
     "settings": {
@@ -98,6 +102,8 @@ def execute_command_action(action_string):
         _handle_monthly_report()
     elif command_name == "category_breakdown":
         _handle_category_breakdown()
+    elif command_name == "spending_trends":
+        _handle_spending_trends()
     elif command_name == "change_pin":
         _handle_change_pin()
     elif command_name == "update_profile":
@@ -202,11 +208,103 @@ def _handle_view_transactions(user_id):
     get_user_input("Press Enter to continue...")
 
 def _handle_monthly_report():
-    add_message("Monthly report functionality not yet implemented.")
+    add_message("--- Monthly Financial Report ---", immediate=True)
+    # Prompt for year and month
+    while True:
+        year_str = get_user_input("Enter year (YYYY) [default: current year]: ")
+        if not year_str:
+            year = datetime.now().year
+            break
+        try:
+            year = int(year_str)
+            break
+        except ValueError:
+            add_message("Error: Invalid year. Please enter a 4-digit year.")
+
+    while True:
+        month_str = get_user_input("Enter month (1-12) [default: current month]: ")
+        if not month_str:
+            month = datetime.now().month
+            break
+        try:
+            month = int(month_str)
+            if 1 <= month <= 12:
+                break
+            else:
+                add_message("Error: Month must be between 1 and 12.")
+        except ValueError:
+            add_message("Error: Invalid month. Enter a number between 1 and 12.")
+
+    # Optional category filter
+    categories_input = get_user_input("Enter comma-separated categories to include (leave empty for all): ")
+    categories = None
+    if categories_input:
+        categories = [c.strip() for c in categories_input.split(",") if c.strip()]
+
+    current_user = SessionManager.get_current_user()
+    if not current_user:
+        add_message("Error: No user logged in.", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    report = generate_monthly_report(current_user.username, year, month, categories)
+
+    # Display report
+    add_message(f"Report for {report['year']}-{report['month']:02d}", immediate=True)
+    add_message(f"Total income : ${report['income']:,.2f}", immediate=True)
+    add_message(f"Total expenses: ${report['expenses']:,.2f}", immediate=True)
+    add_message(f"Savings       : ${report['savings']:,.2f}", immediate=True)
+    add_message(f"Transactions  : {report.get('transactions_count', 0)}", immediate=True)
+
+    # Category breakdown moved to the dedicated 'Category Breakdown' menu option
     get_user_input("Press Enter to continue...")
 
 def _handle_category_breakdown():
-    add_message("Category breakdown functionality not yet implemented.")
+    add_message("--- Category Breakdown ---", immediate=True)
+    current_user = SessionManager.get_current_user()
+    if not current_user:
+        add_message("Error: No user logged in.", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    # Prompt for year and month (default to current)
+    while True:
+        year_str = get_user_input("Enter year (YYYY) [default: current year]: ")
+        if not year_str:
+            year = datetime.now().year
+            break
+        try:
+            year = int(year_str)
+            break
+        except ValueError:
+            add_message("Error: Invalid year. Please enter a 4-digit year.")
+
+    while True:
+        month_str = get_user_input("Enter month (1-12) [default: current month]: ")
+        if not month_str:
+            month = datetime.now().month
+            break
+        try:
+            month = int(month_str)
+            if 1 <= month <= 12:
+                break
+            else:
+                add_message("Error: Month must be between 1 and 12.")
+        except ValueError:
+            add_message("Error: Invalid month. Enter a number between 1 and 12.")
+
+    # Generate report for the selected month and display category breakdown
+    report = generate_monthly_report(current_user.username, year, month)
+
+    add_message(f"Category breakdown for {report['year']}-{report['month']:02d}:", immediate=True)
+    if not report['category_breakdown']:
+        add_message("No transactions for the selected month.", immediate=True)
+    else:
+        # Sort categories alphabetically for stable output
+        for cat in sorted(report['category_breakdown'].keys()):
+            vals = report['category_breakdown'][cat]
+            add_message(f"- {cat}: expenses=${vals['expenses']:,.2f}, income=${vals['income']:,.2f}, count={vals['count']}", immediate=True)
+
     get_user_input("Press Enter to continue...")
 
 def _handle_change_pin():
@@ -242,4 +340,66 @@ def _handle_change_pin():
         add_message("PIN changed successfully.", immediate=True)
     else:
         add_message("Error: Failed to change PIN.", immediate=True)
+    get_user_input("Press Enter to continue...")
+
+
+def _handle_spending_trends():
+    add_message("--- Spending Trends (Current Month) ---", immediate=True)
+    current_user = SessionManager.get_current_user()
+    if not current_user:
+        add_message("Error: No user logged in.", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    now = datetime.now()
+    year = now.year
+    month = now.month
+
+    # Gather expense transactions for the user in the selected month
+    transactions = _transaction_manager.get_all_transactions(current_user.username)
+    daily_totals = {}
+    for t in transactions:
+        try:
+            dt = datetime.fromisoformat(t.date)
+        except Exception:
+            continue
+        if dt.year == year and dt.month == month and t.type == 'expense':
+            day = dt.day
+            daily_totals[day] = daily_totals.get(day, Decimal(0)) + Decimal(str(t.amount))
+
+    # Prepare days array
+    _, days_in_month = calendar.monthrange(year, month)
+    day_values = [float(daily_totals.get(d, Decimal(0))) for d in range(1, days_in_month + 1)]
+
+    if all(v == 0 for v in day_values):
+        add_message("No expense transactions for the current month.", immediate=True)
+        get_user_input("Press Enter to continue...")
+        return
+
+    # Render improved fixed-width ASCII bar chart (width up to 40)
+    max_val = max(day_values)
+    max_bar = 40
+    avg_val = sum(day_values) / len(day_values) if day_values else 0
+
+    add_message(f"Spending trends for {now.strftime('%B %Y')} (max day: ${max_val:,.2f}, avg/day: ${avg_val:,.2f}):", immediate=True)
+    add_message("".ljust(0), immediate=True)
+
+    bar_char = '█'
+    empty_char = ' '
+    amount_width = 10
+
+    # Header for bar scale
+    add_message(f"    Day |{'Bar'.ljust(max_bar)}| Amount", immediate=True)
+    add_message(f"    ----+{'-' * max_bar}+{'-' * (amount_width+1)}", immediate=True)
+
+    for day, val in enumerate(day_values, start=1):
+        bar_len = int((val / max_val) * max_bar) if max_val > 0 else 0
+        bar = bar_char * bar_len
+        empty = empty_char * (max_bar - bar_len)
+        add_message(f" {day:02d}  |{bar}{empty}| ${val:>{amount_width - 1},.2f}", immediate=True)
+
+    # Legend showing scale
+    add_message("".ljust(0), immediate=True)
+    add_message(f"Scale: 0 {' ' * (max_bar-6)} ${max_val:,.2f}", immediate=True)
+
     get_user_input("Press Enter to continue...")
