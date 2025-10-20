@@ -7,6 +7,8 @@ from src.services.data_persistence import DataPersistenceService
 from src.services.transaction_manager import TransactionManager
 
 from src.utils.prompt_toolkit_utils import get_user_input, clear_screen, add_message, display_messages
+from src.services.reporting import generate_dashboard_summary, generate_monthly_report
+from src.services.transaction_manager import TransactionManager
 
 def _run_initial_setup_menu():
     user_persistence = UserAccountPersistence()

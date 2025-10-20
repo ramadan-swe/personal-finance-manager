@@ -57,7 +57,7 @@
     },
     {
         "id": "TX007",
-        "amount": 12421.0,
+        "amount": 10000.0,
         "date": "2025-10-26",
         "type": "income",
         "description": "gaskb",

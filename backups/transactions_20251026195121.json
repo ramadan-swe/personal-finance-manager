@@ -57,10 +57,24 @@
     },
     {
         "id": "TX007",
-        "amount": 12421.0,
+        "amount": 10000.0,
         "date": "2025-10-26",
         "type": "income",
         "description": "gaskb",
+        "category": "Uncategorized",
+        "user_id": "ahmed",
+        "payment_method": "debit",
+        "currency": {
+            "short_name": "USD",
+            "symbol": "$"
+        }
+    },
+    {
+        "id": "TX008",
+        "amount": 512.0,
+        "date": "2025-10-26",
+        "type": "expense",
+        "description": "asvxvnl2",
         "category": "Uncategorized",
         "user_id": "ahmed",
         "payment_method": "debit",
