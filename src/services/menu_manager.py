@@ -17,6 +17,7 @@ _ALL_MENUS = {
         "label": "Main Menu",
         "items": [
             {"id": "view_transactions", "label": "View Transactions", "action": "command:view_transactions", "help_text": "View all recorded transactions"},
+            {"id": "search_menu", "label": "Search & Filter", "action": "menu:search_filter", "help_text": "Search and filter transactions"},
             {"id": "add_transaction", "label": "Add Transaction", "action": "command:add_transaction", "help_text": "Add a new financial transaction"},
             {"id": "reports_menu", "label": "Reports", "action": "menu:reports", "help_text": "Access financial reports"},
             {"id": "settings_menu", "label": "Settings", "action": "menu:settings", "help_text": "Configure application settings"},
@@ -27,6 +28,14 @@ _ALL_MENUS = {
         "items": [
             {"id": "monthly_report", "label": "Monthly Report", "action": "command:monthly_report", "help_text": "Generate monthly financial report"},
             {"id": "category_breakdown", "label": "Category Breakdown", "action": "command:category_breakdown", "help_text": "View spending by category"},
+        ]
+    },
+    "search_filter": {
+        "label": "Search & Filter",
+        "items": [
+            {"id": "search_date_range", "label": "Search by Date Range", "action": "command:search_date_range", "help_text": "Search transactions by start and end date"},
+            {"id": "filter_category", "label": "Filter by Category", "action": "command:filter_by_category", "help_text": "Show transactions for a given category"},
+            {"id": "amount_range", "label": "Amount Range Filter", "action": "command:amount_range_filter", "help_text": "Filter transactions by amount range"},
         ]
     },
     "settings": {
@@ -98,6 +107,12 @@ def execute_command_action(action_string):
         _handle_monthly_report()
     elif command_name == "category_breakdown":
         _handle_category_breakdown()
+    elif command_name == "search_date_range":
+        _handle_search_by_date_range(user_id)
+    elif command_name == "filter_by_category":
+        _handle_filter_by_category(user_id)
+    elif command_name == "amount_range_filter":
+        _handle_amount_range_filter(user_id)
     elif command_name == "change_pin":
         _handle_change_pin()
     elif command_name == "update_profile":
@@ -208,6 +223,100 @@ def _handle_monthly_report():
 def _handle_category_breakdown():
     add_message("Category breakdown functionality not yet implemented.")
     get_user_input("Press Enter to continue...")
+
+
+def _handle_search_by_date_range(user_id):
+    add_message("--- Search Transactions by Date Range ---")
+    while True:
+        start_str = get_user_input("Start date (YYYY-MM-DD): ")
+        is_valid, start_date = validate_iso_date(start_str)
+        if is_valid:
+            break
+        add_message(f"Error: {start_date}")
+
+    while True:
+        end_str = get_user_input("End date (YYYY-MM-DD): ")
+        is_valid, end_date = validate_iso_date(end_str)
+        if is_valid:
+            break
+        add_message(f"Error: {end_date}")
+
+    transactions = _transaction_manager.get_all_transactions(user_id)
+    matched = [t for t in transactions if start_date <= t.date <= end_date]
+    if not matched:
+        add_message("No transactions found in that date range.", immediate=True)
+    else:
+        _display_transactions_table(matched)
+    get_user_input("Press Enter to continue...")
+
+
+def _handle_filter_by_category(user_id):
+    add_message("--- Filter Transactions by Category ---")
+    categories = get_categories()
+    add_message(f"Available categories: {', '.join(categories)}", immediate=True)
+    category = get_user_input("Enter category (or leave empty for 'Uncategorized'): ")
+    if not category:
+        category = "Uncategorized"
+
+    transactions = _transaction_manager.get_all_transactions(user_id)
+    matched = [t for t in transactions if t.category == category]
+    if not matched:
+        add_message(f"No transactions found for category '{category}'.", immediate=True)
+    else:
+        _display_transactions_table(matched)
+    get_user_input("Press Enter to continue...")
+
+
+def _handle_amount_range_filter(user_id):
+    add_message("--- Amount Range Filter ---")
+    while True:
+        min_str = get_user_input("Minimum amount: ")
+        is_valid, min_val = validate_number(min_str)
+        if is_valid:
+            break
+        add_message(f"Error: {min_val}")
+
+    while True:
+        max_str = get_user_input("Maximum amount: ")
+        is_valid, max_val = validate_number(max_str)
+        if is_valid:
+            break
+        add_message(f"Error: {max_val}")
+
+    transactions = _transaction_manager.get_all_transactions(user_id)
+    matched = [t for t in transactions if float(min_val) <= float(t.amount) <= float(max_val)]
+    if not matched:
+        add_message("No transactions found in that amount range.", immediate=True)
+    else:
+        _display_transactions_table(matched)
+    get_user_input("Press Enter to continue...")
+
+
+def _display_transactions_table(transactions):
+    # Reuse the same table formatting as _handle_view_transactions
+    id_width = 10
+    date_width = 12
+    type_width = 8
+    category_width = 25
+    amount_width = 12
+    description_width = 40
+
+    header = (f"{'ID':<{id_width}} | {'Date':<{date_width}} | {'Type':<{type_width}} | "
+              f"{'Category':<{category_width}} | {'Amount':>{amount_width}} | {'Description':<{description_width}}")
+    separator = "=" * (id_width + date_width + type_width + category_width + amount_width + description_width + (5 * 3))
+
+    add_message(separator, immediate=True)
+    add_message(header, immediate=True)
+    add_message("-" * len(header), immediate=True)
+
+    for t in transactions:
+        display_id = t.id[:id_width-3] + "..." if len(t.id) > id_width else t.id
+        formatted_amount = f"${t.amount:,.2f}"
+        display_description = t.description[:description_width] + "..." if len(t.description) > description_width else t.description
+        row = (f"{display_id:<{id_width}} | {t.date:<{date_width}} | {t.type:<{type_width}} | "
+               f"{t.category:<{category_width}} | {formatted_amount:>{amount_width}} | {display_description:<{description_width}}")
+        add_message(row, immediate=True)
+    add_message(separator, immediate=True)
 
 def _handle_change_pin():
     add_message("--- Change PIN ---", immediate=True)
