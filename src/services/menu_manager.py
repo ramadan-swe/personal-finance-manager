@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from src.utils.prompt_toolkit_utils import display_menu, get_user_input, add_message, print_formatted_text
 from src.utils.input_validator import validate_number, validate_iso_date, validate_type, validate_description, validate_category, validate_pin
 from src.services.transaction_manager import TransactionManager
@@ -33,7 +33,7 @@ _ALL_MENUS = {
     "search_filter": {
         "label": "Search & Filter",
         "items": [
-            {"id": "search_date_range", "label": "Search by Date Range", "action": "command:search_date_range", "help_text": "Search transactions by start and end date"},
+            {"id": "search_date_range", "label": "Search Transactions by Date Range", "action": "command:search_date_range", "help_text": "Search transactions by start and end date"},
             {"id": "filter_category", "label": "Filter by Category", "action": "command:filter_by_category", "help_text": "Show transactions for a given category"},
             {"id": "amount_range", "label": "Amount Range Filter", "action": "command:amount_range_filter", "help_text": "Filter transactions by amount range"},
         ]
@@ -227,26 +227,56 @@ def _handle_category_breakdown():
 
 def _handle_search_by_date_range(user_id):
     add_message("--- Search Transactions by Date Range ---")
+    # Prompt for start date
     while True:
         start_str = get_user_input("Start date (YYYY-MM-DD): ")
-        is_valid, start_date = validate_iso_date(start_str)
+        is_valid, start_date_str = validate_iso_date(start_str)
         if is_valid:
-            break
-        add_message(f"Error: {start_date}")
+            try:
+                start_dt = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                break
+            except Exception:
+                add_message("Error: Invalid start date format.")
+                continue
+        add_message(f"Error: {start_date_str}")
 
+    # Prompt for end date
     while True:
         end_str = get_user_input("End date (YYYY-MM-DD): ")
-        is_valid, end_date = validate_iso_date(end_str)
+        is_valid, end_date_str = validate_iso_date(end_str)
         if is_valid:
+            try:
+                end_dt = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            except Exception:
+                add_message("Error: Invalid end date format.")
+                continue
+            # Validate range
+            if end_dt < start_dt:
+                add_message("Error: End date must be the same or after start date.")
+                continue
             break
-        add_message(f"Error: {end_date}")
+        add_message(f"Error: {end_date_str}")
 
     transactions = _transaction_manager.get_all_transactions(user_id)
-    matched = [t for t in transactions if start_date <= t.date <= end_date]
+    # Filter by inclusive date range
+    matched = []
+    for t in transactions:
+        try:
+            t_dt = datetime.strptime(t.date, "%Y-%m-%d").date()
+        except Exception:
+            # Skip malformed dates
+            continue
+        if start_dt <= t_dt <= end_dt:
+            matched.append(t)
+
     if not matched:
         add_message("No transactions found in that date range.", immediate=True)
     else:
+        # Sort by date ascending
+        matched.sort(key=lambda x: x.date)
+        add_message(f"Found {len(matched)} transaction(s) between {start_dt} and {end_dt}.", immediate=True)
         _display_transactions_table(matched)
+
     get_user_input("Press Enter to continue...")
 
 
