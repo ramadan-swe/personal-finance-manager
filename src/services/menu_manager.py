@@ -34,7 +34,7 @@ _ALL_MENUS = {
         "label": "Search & Filter",
         "items": [
             {"id": "search_date_range", "label": "Search Transactions by Date Range", "action": "command:search_date_range", "help_text": "Search transactions by start and end date"},
-            {"id": "filter_category", "label": "Filter by Category", "action": "command:filter_by_category", "help_text": "Show transactions for a given category"},
+            {"id": "filter_category", "label": "Filter Transactions by Category", "action": "command:filter_by_category", "help_text": "Show transactions for a given category"},
             {"id": "amount_range", "label": "Amount Range Filter", "action": "command:amount_range_filter", "help_text": "Filter transactions by amount range"},
         ]
     },
@@ -284,15 +284,45 @@ def _handle_filter_by_category(user_id):
     add_message("--- Filter Transactions by Category ---")
     categories = get_categories()
     add_message(f"Available categories: {', '.join(categories)}", immediate=True)
-    category = get_user_input("Enter category (or leave empty for 'Uncategorized'): ")
-    if not category:
-        category = "Uncategorized"
+    add_message("You may enter multiple categories separated by commas (e.g. Food,Transport). Leave empty to show 'Uncategorized'.", immediate=True)
+
+    while True:
+        categories_input = get_user_input("Enter category or categories: ")
+        if not categories_input:
+            selected = ["Uncategorized"]
+            break
+        # Parse comma-separated list
+        parts = [p.strip() for p in categories_input.split(',') if p.strip()]
+        if not parts:
+            add_message("Please enter at least one category or leave empty for 'Uncategorized'.")
+            continue
+
+        # Build mapping for case-insensitive match
+        canonical = {c.lower(): c for c in categories}
+        resolved = []
+        invalid = []
+        for p in parts:
+            low = p.lower()
+            if low in canonical:
+                resolved.append(canonical[low])
+            elif p == "Uncategorized":
+                resolved.append("Uncategorized")
+            else:
+                invalid.append(p)
+
+        if invalid:
+            add_message(f"Invalid categories: {', '.join(invalid)}. Please choose from available categories.")
+            continue
+
+        selected = list(dict.fromkeys(resolved))
+        break
 
     transactions = _transaction_manager.get_all_transactions(user_id)
-    matched = [t for t in transactions if t.category == category]
+    matched = [t for t in transactions if t.category in selected]
     if not matched:
-        add_message(f"No transactions found for category '{category}'.", immediate=True)
+        add_message(f"No transactions found for category(ies) '{', '.join(selected)}'.", immediate=True)
     else:
+        add_message(f"Found {len(matched)} transaction(s) for category(ies): {', '.join(selected)}", immediate=True)
         _display_transactions_table(matched)
     get_user_input("Press Enter to continue...")
 
