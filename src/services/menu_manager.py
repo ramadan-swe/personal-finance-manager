@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from src.utils.prompt_toolkit_utils import display_menu, get_user_input, add_message, print_formatted_text
-from src.utils.input_validator import validate_number, validate_iso_date, validate_type, validate_description, validate_category, validate_pin
+from src.utils.input_validator import validate_number, validate_currency, validate_iso_date, validate_type, validate_description, validate_category, validate_pin
 from src.services.transaction_manager import TransactionManager
 from src.services.category_manager import get_categories, is_valid_category
 from src.services.session_manager import SessionManager
@@ -328,26 +328,85 @@ def _handle_filter_by_category(user_id):
 
 
 def _handle_amount_range_filter(user_id):
+    from decimal import Decimal, InvalidOperation
+
     add_message("--- Amount Range Filter ---")
+    add_message("You can enter amounts like 12.34 or $12.34. Leave blank to cancel.", immediate=True)
+
+    # Prompt for minimum amount
     while True:
         min_str = get_user_input("Minimum amount: ")
-        is_valid, min_val = validate_number(min_str)
-        if is_valid:
-            break
-        add_message(f"Error: {min_val}")
+        if not min_str:
+            add_message("Amount range filter cancelled.")
+            return
+        # Try numeric then currency validator
+        is_valid_num, num_val = validate_number(min_str)
+        if is_valid_num:
+            try:
+                min_val = Decimal(str(float(num_val)))
+                break
+            except Exception:
+                add_message(f"Error: Invalid minimum amount ('{min_str}'). Please enter a numeric value.")
+                continue
 
+        is_valid_cur, cur_val = validate_currency(min_str)
+        if is_valid_cur:
+            try:
+                min_val = Decimal(str(float(cur_val)))
+                break
+            except Exception:
+                add_message(f"Error: Invalid minimum amount ('{min_str}'). Please enter a numeric value.")
+                continue
+
+        # Neither validator passed
+        add_message(f"Error: Invalid minimum amount ('{min_str}'). Please enter a numeric value (e.g., 12.34 or $12.34).")
+
+    # Prompt for maximum amount
     while True:
         max_str = get_user_input("Maximum amount: ")
-        is_valid, max_val = validate_number(max_str)
-        if is_valid:
-            break
-        add_message(f"Error: {max_val}")
+        if not max_str:
+            add_message("Amount range filter cancelled.")
+            return
+        is_valid_num, num_val = validate_number(max_str)
+        if is_valid_num:
+            try:
+                max_val = Decimal(str(float(num_val)))
+            except Exception:
+                add_message(f"Error: Invalid maximum amount ('{max_str}'). Please enter a numeric value.")
+                continue
+        else:
+            is_valid_cur, cur_val = validate_currency(max_str)
+            if is_valid_cur:
+                try:
+                    max_val = Decimal(str(float(cur_val)))
+                except Exception:
+                    add_message(f"Error: Invalid maximum amount ('{max_str}'). Please enter a numeric value.")
+                    continue
+            else:
+                add_message(f"Error: Invalid maximum amount ('{max_str}'). Please enter a numeric value (e.g., 12.34 or $12.34).")
+                continue
+
+        if max_val < min_val:
+            add_message("Error: Maximum amount must be greater than or equal to minimum amount.")
+            continue
+        break
 
     transactions = _transaction_manager.get_all_transactions(user_id)
-    matched = [t for t in transactions if float(min_val) <= float(t.amount) <= float(max_val)]
+    matched = []
+    for t in transactions:
+        try:
+            amt = Decimal(str(t.amount))
+        except Exception:
+            continue
+        if min_val <= amt <= max_val:
+            matched.append(t)
+
     if not matched:
         add_message("No transactions found in that amount range.", immediate=True)
     else:
+        # sort by amount ascending
+        matched.sort(key=lambda x: float(x.amount))
+        add_message(f"Found {len(matched)} transaction(s) in amount range ${min_val:,.2f} - ${max_val:,.2f}", immediate=True)
         _display_transactions_table(matched)
     get_user_input("Press Enter to continue...")
 
