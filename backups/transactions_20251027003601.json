@@ -57,7 +57,7 @@
     },
     {
         "id": "TX007",
-        "amount": 12421.0,
+        "amount": 10000.0,
         "date": "2025-10-26",
         "type": "income",
         "description": "gaskb",
@@ -76,6 +76,20 @@
         "type": "expense",
         "description": "asvxvnl2",
         "category": "Uncategorized",
+        "user_id": "ahmed",
+        "payment_method": "debit",
+        "currency": {
+            "short_name": "USD",
+            "symbol": "$"
+        }
+    },
+    {
+        "id": "TX009",
+        "amount": 3000.0,
+        "date": "2025-10-27",
+        "type": "expense",
+        "description": "Contribution to goal: fund",
+        "category": "fund",
         "user_id": "ahmed",
         "payment_method": "debit",
         "currency": {
