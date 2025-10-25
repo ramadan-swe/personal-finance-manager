@@ -23,6 +23,9 @@ class AutoSaveJob:
     status: str
     errors: str
 
+# Backup management constants
+MAX_BACKUPS = 5
+
 class DataPersistenceService:
     def __init__(self, data_file="transactions.json", backup_dir="backups"):
         self.data_file = data_file
@@ -30,14 +33,7 @@ class DataPersistenceService:
         if not os.path.exists(self.backup_dir):
             os.makedirs(self.backup_dir)
 
-    def handle_corruption(self):
-        """
-        Detects and handles corrupted or partially written files.
-        Offers recovery from backups.
-        """
-        # For now, just a placeholder
-        print("Checking for file corruption...")
-        pass
+
 
     def save_data(self, transactions):
         """
@@ -81,38 +77,30 @@ class DataPersistenceService:
     def import_data(self, format, input_path, user_id):
         """
         Imports data from CSV or JSON format.
+        Returns raw dictionaries instead of Transaction objects.
         """
-        # Local import to break circular dependency
-        from src.models.transaction import Transaction
         if format == 'json':
             if not os.path.exists(input_path):
                 return False, "File not found."
             with open(input_path, 'r') as f:
                 try:
                     data = json.load(f)
-                    transactions = [Transaction.from_dict(t) for t in data]
+                    return True, data
                 except json.JSONDecodeError:
                     return False, "Invalid JSON format."
         elif format == 'csv':
             if not os.path.exists(input_path):
                 return False, "File not found."
-            
+
             try:
                 with open(input_path, 'r') as f:
                     reader = csv.DictReader(f)
-                    transactions = []
-                    for row in reader:
-                        transactions.append(Transaction.from_dict(row))
+                    data = [row for row in reader]
+                return True, data
             except Exception as e:
                 return False, f"Error importing from CSV: {e}"
         else:
             return False, "Unsupported format."
-
-        from src.services.transaction_manager import TransactionManager
-        transaction_manager = TransactionManager(self)
-        imported_count, skipped_count = transaction_manager.import_transactions(transactions, user_id)
-        
-        return True, f"Data imported successfully. {imported_count} transactions imported, {skipped_count} skipped."
 
     def create_backup(self):
         """
@@ -132,16 +120,16 @@ class DataPersistenceService:
 
     def prune_backups(self):
         """
-        Prunes old backups to maintain 5 backups.
+        Prunes old backups to maintain MAX_BACKUPS backups.
         """
         backup_files = [f for f in os.listdir(self.backup_dir) if f.startswith("transactions_") and f.endswith(".json")]
-        
-        if len(backup_files) <= 5:
+
+        if len(backup_files) <= MAX_BACKUPS:
             return
 
         backup_files.sort()
-        
-        files_to_delete = backup_files[:-5]
+
+        files_to_delete = backup_files[:-MAX_BACKUPS]
         
         for file_to_delete in files_to_delete:
             os.remove(os.path.join(self.backup_dir, file_to_delete))
@@ -171,17 +159,17 @@ class DataPersistenceService:
     def load_data(self):
         """
         Loads transaction data from the data file.
+        Returns raw dictionaries instead of Transaction objects.
         """
-        # Local import to break circular dependency
-        from src.models.transaction import Transaction
         if not os.path.exists(self.data_file):
             return []
-        
+
         with open(self.data_file, 'r') as f:
             try:
                 data = json.load(f)
-                return [Transaction.from_dict(t) for t in data]
+                return data
             except json.JSONDecodeError:
                 # Handle corrupted file. For now, return empty list.
-                print(f"Warning: Corrupted data file {self.data_file}. Returning empty transactions.")
+                from src.utils.prompt_toolkit_utils import add_message
+                add_message(f"Warning: Corrupted data file {self.data_file}. Returning empty transactions.")
                 return []

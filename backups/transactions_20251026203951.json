@@ -84,12 +84,26 @@
         }
     },
     {
-        "id": "TX009",
-        "amount": 3000.0,
-        "date": "2025-10-27",
-        "type": "expense",
-        "description": "Contribution to goal: fund",
-        "category": "fund",
+        "id": "TX999",
+        "amount": 10000.0,
+        "date": "2025-10-24",
+        "type": "income",
+        "description": "gaskb",
+        "category": "Uncategorized",
+        "user_id": "ahmed",
+        "payment_method": "debit",
+        "currency": {
+            "short_name": "USD",
+            "symbol": "$"
+        }
+    },
+    {
+        "id": "TX998",
+        "amount": 100.0,
+        "date": "2025-10-04",
+        "type": "income",
+        "description": "gaskb",
+        "category": "Uncategorized",
         "user_id": "ahmed",
         "payment_method": "debit",
         "currency": {

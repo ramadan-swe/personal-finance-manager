@@ -11,15 +11,15 @@ def register():
     pin_confirm = get_user_input('Confirm PIN: ', hide_input=True)
 
     if pin != pin_confirm:
-        print("PINs do not match. Please try again.")
+        add_message("PINs do not match. Please try again.")
         return False # Return False on failure
 
     service = UserManagementService()
     if service.register_user(username, pin):
-        print(f"User '{username}' registered successfully.")
+        add_message(f"User '{username}' registered successfully.")
         return True # Return True on success
     else:
-        print(f"Error: User '{username}' already exists or registration failed.")
+        add_message(f"Error: User '{username}' already exists or registration failed.")
         return False # Return False on failure
 
 def login():
@@ -31,17 +31,17 @@ def login():
     user_account = service.authenticate_user(username, pin)
     if user_account:
         SessionManager.login_user(user_account)
-        print(f"User '{username}' logged in successfully.")
+        add_message(f"User '{username}' logged in successfully.")
         return True # Return True on success
     else:
-        print("Error: Invalid username or PIN.")
+        add_message("Error: Invalid username or PIN.")
         return False # Return False on failure
 
 def update_profile_command():
     """Updates the current user's profile information."""
     current_user = SessionManager.get_current_user()
     if not current_user:
-        print("Error: No user is currently logged in.")
+        add_message("Error: No user is currently logged in.")
         return
 
     name = get_user_input('New name for the profile (leave empty to skip): ')
@@ -58,16 +58,16 @@ def update_profile_command():
             current_user.profile_info.update(prefs)
             updated = True
         except json.JSONDecodeError:
-            print("Error: Invalid JSON format for preferences.")
+            add_message("Error: Invalid JSON format for preferences.")
             return
 
     if updated:
         if service.update_profile(current_user):
-            print("Profile updated successfully.")
+            add_message("Profile updated successfully.")
         else:
-            print("Error: Failed to update profile.")
+            add_message("Error: Failed to update profile.")
     else:
-        print("No updates provided.")
+        add_message("No updates provided.")
 
 def switch():
     """Switches to another user account."""
@@ -87,7 +87,7 @@ def logout():
     if SessionManager.is_logged_in():
         current_user = SessionManager.get_current_user()
         if current_user: # Ensure current_user is not None before accessing its attributes
-            print(f"User '{current_user.username}' logged out successfully.")
+            add_message(f"User '{current_user.username}' logged out successfully.")
         SessionManager.logout_user() # Always attempt to log out, even if current_user was None unexpectedly
     else:
-        print("No user is currently logged in.")
+        add_message("No user is currently logged in.")

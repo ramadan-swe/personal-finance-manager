@@ -1,8 +1,5 @@
-import json
-import os
-from math import floor, log10
 from enum import Enum
-from src.services.data_persistence import DataPersistenceService # Import DataPersistenceService
+from decimal import Decimal
 
 class Currency:
     def __init__(self, short_name, symbol):
@@ -24,12 +21,12 @@ class Currencies:
     EGP = Currency("EGP", "E£")
 
     @classmethod
-    def get_all(cls):
+    def get_currencies(cls):
         return [cls.USD, cls.EUR, cls.GBP, cls.JPY, cls.EGP]
 
     @classmethod
     def from_short_name(cls, short_name):
-        for currency in cls.get_all():
+        for currency in cls.get_currencies():
             if currency.short_name == short_name:
                 return currency
         return None
@@ -42,7 +39,7 @@ class PaymentMethod(Enum):
 class Transaction:
     def __init__(self, amount, date, type, description, category, user_id, payment_method, currency, id=None):
         self.id = id
-        self.amount = float(amount)
+        self.amount = Decimal(str(amount))
         self.date = date # Store as ISO format string YYYY-MM-DD
         self.type = type # "income" or "expense"
         self.description = description
@@ -54,7 +51,7 @@ class Transaction:
     def to_dict(self, target='json'):
         d = {
             "id": self.id,
-            "amount": self.amount,
+            "amount": float(self.amount),
             "date": self.date,
             "type": self.type,
             "description": self.description,
@@ -86,7 +83,7 @@ class Transaction:
                 payment_method = None
 
         return cls(
-            amount=float(data["amount"]),
+            amount=Decimal(str(data["amount"])),
             date=data["date"],
             type=data["type"],
             description=data["description"],

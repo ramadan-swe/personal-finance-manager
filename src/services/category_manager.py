@@ -8,10 +8,3 @@ def get_categories():
 def is_valid_category(category):
     return category in _categories
 
-def add_category(category):
-    global _categories
-    if category not in _categories:
-        _categories.append(category)
-        _categories.sort()
-        return True
-    return False

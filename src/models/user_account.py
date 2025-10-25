@@ -36,7 +36,8 @@ class UserAccountPersistence:
                         self.accounts = {username: UserAccount.from_dict(account_data) for username, account_data in data.items()}
                     except json.JSONDecodeError:
                         # Handle corrupted JSON file, e.g., log error and start with empty accounts
-                        print(f"Warning: Corrupted user_accounts.json found. Starting with empty accounts.")
+                        from src.utils.prompt_toolkit_utils import add_message
+                        add_message("Warning: Corrupted user_accounts.json found. Starting with empty accounts.")
                         self.accounts = {}
             else:
                 self.accounts = {}

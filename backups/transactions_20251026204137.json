@@ -57,7 +57,7 @@
     },
     {
         "id": "TX007",
-        "amount": 12421.0,
+        "amount": 10000.0,
         "date": "2025-10-26",
         "type": "income",
         "description": "gaskb",
@@ -84,14 +84,42 @@
         }
     },
     {
-        "id": "TX009",
-        "amount": 213.0,
-        "date": "2025-10-26",
-        "type": "expense",
-        "description": "asas2",
+        "id": "TX999",
+        "amount": 10000.0,
+        "date": "2025-10-24",
+        "type": "income",
+        "description": "gaskb",
         "category": "Uncategorized",
         "user_id": "ahmed",
-        "payment_method": "credit",
+        "payment_method": "debit",
+        "currency": {
+            "short_name": "USD",
+            "symbol": "$"
+        }
+    },
+    {
+        "id": "TX998",
+        "amount": 100.0,
+        "date": "2025-10-04",
+        "type": "income",
+        "description": "gaskb",
+        "category": "Uncategorized",
+        "user_id": "ahmed",
+        "payment_method": "debit",
+        "currency": {
+            "short_name": "USD",
+            "symbol": "$"
+        }
+    },
+    {
+        "id": "TX997",
+        "amount": 50.0,
+        "date": "2025-10-01",
+        "type": "income",
+        "description": "gaskb",
+        "category": "Uncategorized",
+        "user_id": "ahmed",
+        "payment_method": "debit",
         "currency": {
             "short_name": "USD",
             "symbol": "$"

@@ -64,8 +64,10 @@ def generate_monthly_report(user_id: str, year: int, month: int, categories: Opt
     savings = income - expenses
 
     # Convert Decimal values to floats for easier display/storage (keeping 2 decimals)
-    def _fmt(d: Decimal):
-        return float(d.quantize(Decimal("0.01")))
+    def _fmt(d):
+        if isinstance(d, Decimal):
+            return float(d.quantize(Decimal("0.01")))
+        return d  # type: ignore
 
     breakdown_out = {}
     for cat, vals in breakdown.items():
@@ -82,42 +84,69 @@ def generate_monthly_report(user_id: str, year: int, month: int, categories: Opt
     }
 
 
-def generate_dashboard_summary(user_id: str, months: int = 3, transactions: Optional[List[Transaction]] = None) -> dict:
-    """Generate a simple dashboard summary over the last `months` months.
 
-    This returns monthly totals for income/expenses and an overall category top-5 breakdown.
+
+
+def generate_financial_health_score(user_id: str, transactions: Optional[List[Transaction]] = None) -> dict:
+    """Generate a financial health score based on all transactions for a given user.
+
+    Args:
+        user_id: username / id of the user
+        transactions: optional list of Transaction objects to use (for testing); if None, fetched from TransactionManager
+
+    Returns:
+        dict with keys: total_income, total_expense, net_savings, savings_ratio, financial_health_score, status
     """
     if transactions is None:
         tm = TransactionManager(DataPersistenceService())
         transactions = tm.get_all_transactions(user_id)
 
-    # Group by year-month
-    monthly = defaultdict(lambda: {"income": Decimal(0), "expenses": Decimal(0)})
-    category_totals = defaultdict(Decimal)
+    total_income = Decimal(0)
+    total_expenses = Decimal(0)
 
     for t in transactions:
-        try:
-            dt = datetime.fromisoformat(t.date)
-        except Exception:
-            continue
-        key = f"{dt.year:04d}-{dt.month:02d}"
         amt = _to_decimal(t.amount)
-        cat = t.category if t.category else "Uncategorized"
         if t.type == "income":
-            monthly[key]["income"] += amt
+            total_income += amt
         else:
-            monthly[key]["expenses"] += amt
-            category_totals[cat] += amt
+            total_expenses += amt
 
-    # Sort months most recent first
-    sorted_months = sorted(monthly.keys(), reverse=True)[:months]
-    monthly_out = [{"month": m, "income": float(monthly[m]["income"].quantize(Decimal("0.01"))), "expenses": float(monthly[m]["expenses"].quantize(Decimal("0.01")))} for m in sorted_months]
+    net_savings = total_income - total_expenses
 
-    # Top categories (by expense)
-    top_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:5]
-    top_categories_out = [{"category": k, "amount": float(v.quantize(Decimal("0.01")))} for k, v in top_categories]
+    savings_ratio = Decimal(0)
+    if total_income > 0:
+        savings_ratio = (net_savings / total_income) * 100
+
+    # Clamp function
+    def clamp(n, minn, maxn):
+        return max(minn, min(n, maxn))
+
+    # Continuous scoring formula: score = clamp(50 + 2.5 * savings_ratio, 0, 100)
+    financial_health_score = clamp(50 + (Decimal("2.5") * savings_ratio), Decimal(0), Decimal(100))
+
+    status = ""
+    if financial_health_score >= 90:
+        status = "Excellent"
+    elif financial_health_score >= 70:
+        status = "Good"
+    elif financial_health_score >= 50:
+        status = "Fair"
+    elif financial_health_score >= 30:
+        status = "Poor"
+    else:
+        status = "Very Poor"
+
+    # Convert Decimal values to floats for easier display/storage (keeping 2 decimals)
+    def _fmt(d):
+        if isinstance(d, Decimal):
+            return float(d.quantize(Decimal("0.01")))
+        return d  # type: ignore
 
     return {
-        "monthly": monthly_out,
-        "top_categories": top_categories_out,
+        "total_income": _fmt(total_income),
+        "total_expense": _fmt(total_expenses),
+        "net_savings": _fmt(net_savings),
+        "savings_ratio": _fmt(savings_ratio),
+        "financial_health_score": _fmt(financial_health_score),
+        "status": status,
     }

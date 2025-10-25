@@ -1,118 +1,66 @@
-from datetime import date, datetime, datetime
-from src.utils.prompt_toolkit_utils import display_menu, get_user_input, add_message, print_formatted_text
-from src.utils.input_validator import validate_number, validate_currency, validate_iso_date, validate_type, validate_description, validate_category, validate_pin
+from datetime import datetime, datetime
+from src.utils.prompt_toolkit_utils import get_user_input, add_message
+from src.utils.input_validator import validate_number, validate_currency_amount, validate_iso_date, validate_pin
+from src.utils.display_utils import _display_transactions_table
+from src.utils.menu_config import ALL_MENUS
 import json
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from src.services.transaction_manager import TransactionManager
-from src.services.category_manager import get_categories, is_valid_category
+from src.services.category_manager import get_categories
+
 from src.services.session_manager import SessionManager
 from src.services.user_management import UserManagementService
 from src.services.data_persistence import DataPersistenceService
 from src.cli.user import update_profile_command, switch, logout
 from src.cli.transaction import add_transaction_command, edit_transaction_command, delete_transaction_command
-from src.services.reporting import generate_monthly_report, generate_dashboard_summary
+from src.services.reporting import generate_monthly_report
 from src.models.transaction import PaymentMethod, Currencies
-from decimal import Decimal
 import calendar
 
-# Global variables for menu management
-_navigation_stack = []
+# Menu navigation management
+class MenuNavigation:
+    def __init__(self):
+        self._navigation_stack = []
 
-# Hardcoded menu structure
-_ALL_MENUS = {
-    "main": {
-        "label": "Main Menu",
-        "items": [
-            {"id": "view_transactions", "label": "View Transactions", "action": "command:view_transactions", "help_text": "View all recorded transactions"},
-            {"id": "search_menu", "label": "Search & Filter", "action": "menu:search_filter", "help_text": "Search and filter transactions"},
-            {"id": "add_transaction", "label": "Add Transaction", "action": "command:add_transaction", "help_text": "Add a new financial transaction"},
-            {"id": "reports_menu", "label": "Reports", "action": "menu:reports", "help_text": "Access financial reports"},
-            {"id": "savings_menu", "label": "Saving goal", "action": "menu:savings", "help_text": "Manage saving goals"},
-            {"id": "settings_menu", "label": "Settings", "action": "menu:settings", "help_text": "Configure application settings"},
-        ]
-    },
-    "reports": {
-        "label": "Reports Menu",
-        "items": [
-            {"id": "monthly_report", "label": "Monthly Report", "action": "command:monthly_report", "help_text": "Generate monthly financial report"},
-                {"id": "category_breakdown", "label": "Category Breakdown", "action": "command:category_breakdown", "help_text": "View spending by category"},
-                {"id": "spending_trends", "label": "Spending Trends", "action": "command:spending_trends", "help_text": "View spending trends for the current month"},
-        ]
-    },
-    "search_filter": {
-        "label": "Search & Filter",
-        "items": [
-            {"id": "search_date_range", "label": "Search Transactions by Date Range", "action": "command:search_date_range", "help_text": "Search transactions by start and end date"},
-            {"id": "filter_category", "label": "Filter Transactions by Category", "action": "command:filter_by_category", "help_text": "Show transactions for a given category"},
-            {"id": "amount_range", "label": "Amount Range Filter", "action": "command:amount_range_filter", "help_text": "Filter transactions by amount range"},
-        ]
-    },
-    "savings": {
-        "label": "Saving Goals",
-        "items": [
-            {"id": "set_saving_goal", "label": "Set Saving Goal", "action": "command:set_saving_goal", "help_text": "Create or update a saving goal"},
-            {"id": "view_saving_goals", "label": "View & Add Saving Goals", "action": "command:view_saving_goals", "help_text": "View existing saving goals and add new ones"},
-        ]
-    },
-    "search_filter": {
-        "label": "Search & Filter",
-        "items": [
-            {"id": "search_date_range", "label": "Search Transactions by Date Range", "action": "command:search_date_range", "help_text": "Search transactions by start and end date"},
-            {"id": "filter_category", "label": "Filter Transactions by Category", "action": "command:filter_by_category", "help_text": "Show transactions for a given category"},
-            {"id": "amount_range", "label": "Amount Range Filter", "action": "command:amount_range_filter", "help_text": "Filter transactions by amount range"},
-        ]
-    },
-    "settings": {
-        "label": "Settings Menu",
-        "items": [
-            {"id": "change_pin", "label": "Change PIN", "action": "command:change_pin", "help_text": "Change user PIN"},
-            {"id": "update_profile", "label": "Update Profile", "action": "command:update_profile", "help_text": "Update current user's profile information"},
-            {"id": "data_management", "label": "Data Management", "action": "menu:data_management", "help_text": "Export, import, or restore data"},
-            {"id": "switch_account", "label": "Switch Account", "action": "command:switch_account", "help_text": "Switch to another user account"},
-            {"id": "logout", "label": "Logout", "action": "command:logout", "help_text": "Log out the current user"},
-        ]
-    },
-    "data_management": {
-        "label": "Data Management",
-        "items": [
-            {"id": "export_data", "label": "Export Data", "action": "command:export_data", "help_text": "Export transactions to a file"},
-            {"id": "import_data", "label": "Import Data", "action": "command:import_data", "help_text": "Import transactions from a file"},
-            {"id": "restore_data", "label": "Restore from Backup", "action": "command:restore_data", "help_text": "Restore transactions from a backup"},
-        ]
-    }
-}
+    def navigate_to_submenu(self, current_menu_id, target_menu_id):
+        self._navigation_stack.append(current_menu_id)
+        return target_menu_id
 
-def initialize_default_menu():
-    # With hardcoded menus, this function primarily serves to ensure _ALL_MENUS is defined.
-    # No dynamic initialization needed.
-    pass
+    def return_to_parent_menu(self):
+        if self._navigation_stack:
+            return self._navigation_stack.pop()
+        return "main"  # Fallback to main menu
+
+# Global menu navigation instance
+menu_nav = MenuNavigation()
+
+
+
+
 
 def get_menu_items(parent_id=None):
-    menu = _ALL_MENUS.get(str(parent_id))
+    menu = ALL_MENUS.get(str(parent_id))
     if menu:
         return menu.get("items", [])
     return []
 
 def get_menu_title(menu_id):
-    menu = _ALL_MENUS.get(menu_id)
+    menu = ALL_MENUS.get(menu_id)
     if menu:
         return menu.get("label", "Menu")
     return "Menu"
 
 def navigate_to_submenu(current_menu_id, target_menu_id):
-    _navigation_stack.append(current_menu_id)
-    return target_menu_id
+    return menu_nav.navigate_to_submenu(current_menu_id, target_menu_id)
 
 def return_to_parent_menu():
-    if _navigation_stack:
-        return _navigation_stack.pop()
-    return "main" # Fallback to main menu
+    return menu_nav.return_to_parent_menu()
 
 def get_contextual_help(menu_id, item_id=None):
     if item_id:
         # Find the specific item's help text
-        for menu_key in _ALL_MENUS:
-            for item in _ALL_MENUS[menu_key].get("items", []):
+        for menu_key in ALL_MENUS:
+            for item in ALL_MENUS[menu_key].get("items", []):
                 if item.get("id") == item_id:
                     return item.get("help_text")
         return "No help available for this item."
@@ -172,13 +120,15 @@ def execute_command_action(action_string, transaction_manager):
         case "restore_data":
             _handle_restore_data(transaction_manager)
         case _:
-            add_message(f"Unknown command: {command_name}")
+            add_message(f"Unknown command: {command_name}", immediate=True)
 
 def _handle_view_transactions(user_id, transaction_manager):
     transactions = transaction_manager.get_all_transactions(user_id)
     if not transactions:
         add_message("No transactions found.", immediate=True)
     else:
+        # Sort transactions by date in descending order
+        transactions.sort(key=lambda t: datetime.fromisoformat(t.date))
         # Define column widths
         id_width = 10
         date_width = 12
@@ -431,8 +381,6 @@ def _handle_filter_by_category(user_id, transaction_manager):
 
 
 def _handle_amount_range_filter(user_id, transaction_manager):
-    from decimal import Decimal, InvalidOperation
-
     add_message("--- Amount Range Filter ---")
     add_message("You can enter amounts like 12.34 or $12.34. Leave blank to cancel.", immediate=True)
 
@@ -442,27 +390,18 @@ def _handle_amount_range_filter(user_id, transaction_manager):
         if not min_str:
             add_message("Amount range filter cancelled.")
             return
-        # Try numeric then currency validator
-        is_valid_num, num_val = validate_number(min_str)
-        if is_valid_num:
+        # Try currency amount validator
+        is_valid_amt, amt_val = validate_currency_amount(min_str)
+        if is_valid_amt:
             try:
-                min_val = Decimal(str(float(num_val)))
+                min_val = Decimal(str(amt_val))
                 break
             except Exception:
                 add_message(f"Error: Invalid minimum amount ('{min_str}'). Please enter a numeric value.")
                 continue
 
-        is_valid_cur, cur_val = validate_currency(min_str)
-        if is_valid_cur:
-            try:
-                min_val = Decimal(str(float(cur_val)))
-                break
-            except Exception:
-                add_message(f"Error: Invalid minimum amount ('{min_str}'). Please enter a numeric value.")
-                continue
-
-        # Neither validator passed
-        add_message(f"Error: Invalid minimum amount ('{min_str}'). Please enter a numeric value (e.g., 12.34 or $12.34).")
+        # Validator failed
+        add_message(f"Error: Invalid minimum amount ('{min_str}'). Please enter a numeric value (e.g., 12.34).")
 
     # Prompt for maximum amount
     while True:
@@ -470,24 +409,16 @@ def _handle_amount_range_filter(user_id, transaction_manager):
         if not max_str:
             add_message("Amount range filter cancelled.")
             return
-        is_valid_num, num_val = validate_number(max_str)
-        if is_valid_num:
+        is_valid_amt, amt_val = validate_currency_amount(max_str)
+        if is_valid_amt:
             try:
-                max_val = Decimal(str(float(num_val)))
+                max_val = Decimal(str(amt_val))
             except Exception:
                 add_message(f"Error: Invalid maximum amount ('{max_str}'). Please enter a numeric value.")
                 continue
         else:
-            is_valid_cur, cur_val = validate_currency(max_str)
-            if is_valid_cur:
-                try:
-                    max_val = Decimal(str(float(cur_val)))
-                except Exception:
-                    add_message(f"Error: Invalid maximum amount ('{max_str}'). Please enter a numeric value.")
-                    continue
-            else:
-                add_message(f"Error: Invalid maximum amount ('{max_str}'). Please enter a numeric value (e.g., 12.34 or $12.34).")
-                continue
+            add_message(f"Error: Invalid maximum amount ('{max_str}'). Please enter a numeric value (e.g., 12.34 or $12.34).")
+            continue
 
         if max_val < min_val:
             add_message("Error: Maximum amount must be greater than or equal to minimum amount.")
@@ -514,31 +445,7 @@ def _handle_amount_range_filter(user_id, transaction_manager):
     get_user_input("Press Enter to continue...")
 
 
-def _display_transactions_table(transactions):
-    # Reuse the same table formatting as _handle_view_transactions
-    id_width = 10
-    date_width = 12
-    type_width = 8
-    category_width = 25
-    amount_width = 12
-    description_width = 40
 
-    header = (f"{'ID':<{id_width}} | {'Date':<{date_width}} | {'Type':<{type_width}} | "
-              f"{'Category':<{category_width}} | {'Amount':>{amount_width}} | {'Description':<{description_width}}")
-    separator = "=" * (id_width + date_width + type_width + category_width + amount_width + description_width + (5 * 3))
-
-    add_message(separator, immediate=True)
-    add_message(header, immediate=True)
-    add_message("-" * len(header), immediate=True)
-
-    for t in transactions:
-        display_id = str(t.id)[:id_width-3] + "..." if len(str(t.id)) > id_width else str(t.id)
-        formatted_amount = f"{getattr(t, 'currency', type('C', (), {'symbol': '$'})) .symbol}{t.amount:,.2f}"
-        display_description = t.description[:description_width] + "..." if len(t.description) > description_width else t.description
-        row = (f"{display_id:<{id_width}} | {t.date:<{date_width}} | {t.type:<{type_width}} | "
-               f"{t.category:<{category_width}} | {formatted_amount:>{amount_width}} | {display_description:<{description_width}}")
-        add_message(row, immediate=True)
-    add_message(separator, immediate=True)
 
 
 ### Savings goal handlers & simple persistence
@@ -695,6 +602,89 @@ def _handle_view_saving_goals(user_id):
         add_message("Invalid input.", immediate=True)
     return
 
+def _compute_net_saving(transactions):
+    """
+    Computes net saving from transactions.
+    Returns total_income, total_expenses, net_saving.
+    """
+    total_income = Decimal(0)
+    total_expenses = Decimal(0)
+    for t in transactions:
+        try:
+            amt = Decimal(str(t.amount))
+        except Exception:
+            continue
+        if getattr(t, 'type', '') == 'income':
+            total_income += amt
+        else:
+            total_expenses += amt
+    net_saving = total_income - total_expenses
+    return total_income, total_expenses, net_saving
+
+def _select_goal(user_goals, selected_index, user_id):
+    """
+    Selects a goal from user_goals.
+    Returns goal_name or None.
+    """
+    if selected_index is None:
+        choice = get_user_input("\nEnter goal number to add money, 'a' to add a new goal, or press Enter to cancel: ").strip().lower()
+        if not choice:
+            return None
+        if choice == 'a':
+            _handle_set_saving_goal(user_id)
+            return None
+        try:
+            sel = int(choice)
+            if sel < 1 or sel > len(user_goals):
+                add_message("Invalid selection.", immediate=True)
+                return None
+            selected_index = sel - 1
+        except Exception:
+            add_message("Invalid input.", immediate=True)
+            return None
+
+    if selected_index < 0 or selected_index >= len(user_goals):
+        add_message("Invalid selection.", immediate=True)
+        return None
+
+    selected_goal = user_goals[selected_index]
+    return str(selected_goal.get('name', '')).strip()
+
+def _validate_contribution(contrib, net_saving):
+    """
+    Validates the contribution amount.
+    Returns True if valid, False otherwise.
+    """
+    if contrib <= Decimal(0):
+        add_message("Amount must be positive.", immediate=True)
+        return False
+    if contrib > net_saving:
+        add_message(f"Insufficient net saving. You have ${net_saving:,.2f} available.", immediate=True)
+        retry = get_user_input("Type 'y' to retry with a smaller amount or press Enter to cancel: ").strip().lower()
+        return retry == 'y'
+    return True
+
+def _record_contribution(contrib, goal_name, user_id):
+    """
+    Records the contribution as a transaction.
+    Returns True if successful.
+    """
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    tm2 = TransactionManager(DataPersistenceService())
+    description = f"Contribution to goal: {goal_name}"
+    payment_method_default = PaymentMethod.DEBIT
+    currency_default = Currencies.USD
+    try:
+        ok = tm2.add_transaction(float(contrib), today_str, 'expense', description, goal_name, user_id, payment_method_default, currency_default)
+    except Exception as e:
+        add_message(f"Error recording contribution: {e}", immediate=True)
+        return False
+
+    if not ok:
+        add_message("Failed to record contribution as a transaction.", immediate=True)
+        return False
+    return True
+
 def _handle_add_to_saving_goal(user_id, transactions=None, selected_index=None):
     """Interactive flow to add a contribution to an existing saving goal.
 
@@ -719,46 +709,13 @@ def _handle_add_to_saving_goal(user_id, transactions=None, selected_index=None):
         return
 
     # Compute net saving
-    net_saving = Decimal(0)
-    total_income = Decimal(0)
-    total_expenses = Decimal(0)
-    for t in transactions:
-        try:
-            amt = Decimal(str(t.amount))
-        except Exception:
-            continue
-        if getattr(t, 'type', '') == 'income':
-            total_income += amt
-        else:
-            total_expenses += amt
-    net_saving = total_income - total_expenses
-
+    total_income, total_expenses, net_saving = _compute_net_saving(transactions)
     add_message("")
     add_message(f"Net available saving: ${net_saving:,.2f}", immediate=True)
 
-    if selected_index is None:
-        choice = get_user_input("\nEnter goal number to add money, 'a' to add a new goal, or press Enter to cancel: ").strip().lower()
-        if not choice:
-            return
-        if choice == 'a':
-            _handle_set_saving_goal(user_id)
-            return
-        try:
-            sel = int(choice)
-            if sel < 1 or sel > len(user_goals):
-                add_message("Invalid selection.", immediate=True)
-                return
-            selected_index = sel - 1
-        except Exception:
-            add_message("Invalid input.", immediate=True)
-            return
-
-    if selected_index < 0 or selected_index >= len(user_goals):
-        add_message("Invalid selection.", immediate=True)
+    goal_name = _select_goal(user_goals, selected_index, user_id)
+    if goal_name is None:
         return
-
-    selected_goal = user_goals[selected_index]
-    goal_name = str(selected_goal.get('name', '')).strip()
 
     # Prompt for contribution amount
     while True:
@@ -766,59 +723,29 @@ def _handle_add_to_saving_goal(user_id, transactions=None, selected_index=None):
         if not amt_str:
             add_message("Add-to-goal cancelled.", immediate=True)
             return
-        is_num, num_val = validate_number(amt_str)
-        if is_num:
+        is_amt, amt_val = validate_currency_amount(amt_str)
+        if is_amt:
             try:
-                contrib = Decimal(str(float(num_val)))
+                contrib = Decimal(str(amt_val))
             except Exception:
                 add_message("Invalid amount. Try again.")
                 continue
         else:
-            is_cur, cur_val = validate_currency(amt_str)
-            if is_cur:
-                try:
-                    contrib = Decimal(str(float(cur_val)))
-                except Exception:
-                    add_message("Invalid amount. Try again.")
-                    continue
-            else:
-                add_message("Invalid amount format. Use numbers like 12.34 or $12.34.")
-                continue
-
-        if contrib <= Decimal(0):
-            add_message("Amount must be positive.", immediate=True)
+            add_message("Invalid amount format. Use numbers like 12.34 or $12.34.")
             continue
-        if contrib > net_saving:
-            add_message(f"Insufficient net saving. You have ${net_saving:,.2f} available.", immediate=True)
-            retry = get_user_input("Type 'y' to retry with a smaller amount or press Enter to cancel: ").strip().lower()
-            if retry == 'y':
-                continue
+
+        if not _validate_contribution(contrib, net_saving):
+            continue
+
+        if not _record_contribution(contrib, goal_name, user_id):
             return
 
-        # Record contribution as an expense transaction categorized by the goal name
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        tm2 = TransactionManager(DataPersistenceService())
-        description = f"Contribution to goal: {goal_name}"
-        # Use proper enum/object types to ensure persistence works
-        payment_method_default = PaymentMethod.DEBIT
-        currency_default = Currencies.USD
+        # Refresh and show updated state
         try:
-            ok = tm2.add_transaction(float(contrib), today_str, 'expense', description, goal_name, user_id, payment_method_default, currency_default)
-        except Exception as e:
-            add_message(f"Error recording contribution: {e}", immediate=True)
-            return
-
-        if not ok:
-            add_message("Failed to record contribution as a transaction.", immediate=True)
-            return
-
-        # Refresh transactions and recompute saved/net saving to show updated state
-        try:
-            transactions = tm2.get_all_transactions(user_id)
+            transactions = TransactionManager(DataPersistenceService()).get_all_transactions(user_id)
         except Exception:
             transactions = []
 
-        # recompute saved for the selected goal
         new_saved = Decimal(0)
         for t in transactions:
             try:
@@ -830,20 +757,7 @@ def _handle_add_to_saving_goal(user_id, transactions=None, selected_index=None):
             if (cat and cat.lower() == goal_name.lower()) or (cat and cat.lower() == 'savings') or (goal_name.lower() in desc.lower()):
                 new_saved += amt
 
-        # recompute net saving
-        total_income = Decimal(0)
-        total_expenses = Decimal(0)
-        for t in transactions:
-            try:
-                amt = Decimal(str(t.amount))
-            except Exception:
-                continue
-            if getattr(t, 'type', '') == 'income':
-                total_income += amt
-            else:
-                total_expenses += amt
-        new_net = total_income - total_expenses
-
+        _, _, new_net = _compute_net_saving(transactions)
         add_message(f"Added ${contrib:,.2f} to '{goal_name}'. New saved=${new_saved:,.2f}, Net available saving=${new_net:,.2f}", immediate=True)
         return
 
@@ -959,7 +873,7 @@ def _handle_export_data(transaction_manager):
         return
     transactions = transaction_manager.get_all_transactions(current_user.username)
     
-    success, message = transaction_manager.persistence.data_persistence_service.export_data(transactions, file_format, file_path)
+    success, message = transaction_manager.data_persistence_service.export_data(transactions, file_format, file_path)
 
     add_message(message)
     get_user_input("Press Enter to continue...")
@@ -978,21 +892,23 @@ def _handle_import_data(transaction_manager):
         add_message("Error: No user is currently logged in. Please log in to import data.")
         get_user_input("Press Enter to continue...")
         return
-    success, message = transaction_manager.persistence.data_persistence_service.import_data(file_format, file_path, current_user.username)
+    success, message = transaction_manager.import_data(file_format, file_path, current_user.username)
 
     add_message(message)
+    if success:
+        transaction_manager._load_transactions() # Reload transactions after successful import
     get_user_input("Press Enter to continue...")
 
 def _handle_restore_data(transaction_manager):
-    backups = transaction_manager.persistence.data_persistence_service.get_backups()
+    backups = transaction_manager.data_persistence_service.get_backups()
     if not backups:
-        add_message("No backups found.")
+        add_message("No backups found.", immediate=True)
         get_user_input("Press Enter to continue...")
         return
 
-    add_message("Available backups:")
+    add_message("Available backups:", immediate=True)
     for i, backup in enumerate(backups):
-        add_message(f"{i+1}. {backup}")
+        add_message(f"{i+1}. {backup}", immediate=True)
 
     choice_str = get_user_input("Enter the number of the backup to restore: ")
     try:
@@ -1005,11 +921,9 @@ def _handle_restore_data(transaction_manager):
         return
 
     selected_backup = backups[choice-1]
-    success, message = transaction_manager.persistence.data_persistence_service.restore_from_backup(selected_backup)
+    success, message = transaction_manager.data_persistence_service.restore_from_backup(selected_backup)
     
     add_message(message)
     if success:
         # Reload transactions after restoring
-        transaction_manager.persistence._load_transactions()
-
-    get_user_input("Press Enter to continue...")
+        transaction_manager._load_transactions()
